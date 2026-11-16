@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "refmap": "mistletoe.refmap.json",
+  "package": "dev.xingguang.terminalblade.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "SuperSlashArtsMixin",
+    "EntitySlashEffectMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

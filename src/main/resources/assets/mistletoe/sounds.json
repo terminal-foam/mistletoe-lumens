@@ -1,0 +1,26 @@
+{
+  "sacrifice": {
+    "subtitle": "subtitles.mistletoe.sacrifice",
+    "sounds": [
+      "mistletoe:sacrifice"
+    ]
+  },
+  "super_charge": {
+    "subtitle": "subtitles.mistletoe.super_charge",
+    "sounds": [
+      "mistletoe:super_charge"
+    ]
+  },
+  "lamp_signal": {
+    "subtitle": "subtitles.mistletoe.lamp_signal",
+    "sounds": [
+      "mistletoe:lamp_signal"
+    ]
+  },
+  "lamp_answer": {
+    "subtitle": "subtitles.mistletoe.lamp_answer",
+    "sounds": [
+      "mistletoe:lamp_answer"
+    ]
+  }
+}

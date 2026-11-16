@@ -1,0 +1,18 @@
+{
+  "structures": [
+    {
+      "structure": "mistletoe:lumen_home",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 20261115,
+    "spacing": 48,
+    "separation": 32,
+    "exclusion_zone": {
+      "chunk_count": 12,
+      "other_set": "minecraft:mineshafts"
+    }
+  }
+}
