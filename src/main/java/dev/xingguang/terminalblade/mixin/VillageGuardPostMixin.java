@@ -25,8 +25,8 @@ abstract class VillageGuardPostMixin {
     @Inject(method = "findGenerationPoint", at = @At("HEAD"))
     private void mistletoe$countCalls(Structure.GenerationContext context,
                                       CallbackInfoReturnable<Optional<Structure.GenerationStub>> cir) {
-        if (++CALLS <= 3 || CALLS % 200 == 0) {
-            TerminalBlade.LOGGER.info("[哨所] findGenerationPoint 第 {} 次调用", CALLS);
+        if (++CALLS <= 3) {
+            TerminalBlade.LOGGER.debug("[哨所] findGenerationPoint 第 {} 次调用", CALLS);
         }
     }
 
