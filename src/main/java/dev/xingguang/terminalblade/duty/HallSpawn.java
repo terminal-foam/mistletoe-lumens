@@ -39,6 +39,20 @@ public final class HallSpawn {
         if (raid == null || !(raid.getLevel() instanceof ServerLevel level)) {
             return null;
         }
+        try {
+            return pick(raid, level);
+        } catch (RuntimeException e) {
+            // 这个方法是 mixin 从原版 Raid.tick 里调进来的，绝不能抛出去。
+            if (FAILURES++ % 20 == 0) {
+                TerminalBlade.LOGGER.error("[流明·星] 大厅刷怪选点异常，本波回退原版刷点", e);
+            }
+            return null;
+        }
+    }
+
+    private static int FAILURES = 0;
+
+    private static BlockPos pick(Raid raid, ServerLevel level) {
         LumenHome home = LumenHome.at(level, raid.getCenter());
         if (home == null || !home.contains(raid.getCenter()) || !home.solvable()) {
             return null;
@@ -95,6 +109,16 @@ public final class HallSpawn {
         if (level.getGameTime() % 5 != 0) {
             return;
         }
+        try {
+            warn(level);
+        } catch (RuntimeException e) {
+            if (FAILURES++ % 20 == 0) {
+                TerminalBlade.LOGGER.error("[流明·星] 大厅刷点预警异常（已跳过本 tick）", e);
+            }
+        }
+    }
+
+    private static void warn(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
             Raid raid = CompanionDuty.raid(level, player.blockPosition());
             if (raid == null || !raid.isActive() || raid.isOver() || raid.isStopped()) {

@@ -76,7 +76,6 @@ public class LumenCompanionEntity extends TamableAnimal implements GeoAnimatable
     private static final long SLASH_WINDUP = 24L;
     private static final long SLASH_COOLDOWN = 240L;
     private static final double SLASH_RANGE = 8.0D;
-    private static final double SLASH_CONE_DEGREES = 120.0D;
     private static final double MELEE_HIT_RANGE = 4.25D;
     /** 普攻连段的顺劈扇形（以朝目标的方向为轴）。 */
     private static final double MELEE_CLEAVE_CONE_DEGREES = 120.0D;

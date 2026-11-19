@@ -91,7 +91,6 @@ public final class LumenHome {
     /** 结构一旦生成就不会移动，按「维度 + 结构范围」缓存，避免每 10 tick 重扫 3 万方块。 */
     private static final java.util.Map<String, LumenHome> CACHE = new java.util.HashMap<>();
 
-    private final List<BlockPos> doorLeaves = new ArrayList<>();
     private final List<BlockPos> singleLeaves = new ArrayList<>();
 
     private LumenHome(ServerLevel level, BoundingBox box) {
@@ -204,10 +203,6 @@ public final class LumenHome {
         matched = best;
         // 注意：这里不能调 toWorld()——它会再进 solve()，而此刻 solvable 还是 false，
         // 会返回 null 并让后面的 List.copyOf 抛 NPE。直接用旋转+平移算。
-        doorLeaves.clear();
-        for (int[] l : DOOR_LEAVES) {
-            doorLeaves.add(zero.offset(rotate(rot, l)));
-        }
         singleLeaves.clear();
         for (int[] l : SINGLE_LEAVES) {
             singleLeaves.add(zero.offset(rotate(rot, l)));
@@ -216,13 +211,14 @@ public final class LumenHome {
         return true;
     }
 
-    public int matchedDoors() {
-        solve();
-        return matched;
-    }
-
     public boolean solvable() {
         return solve();
+    }
+
+    /** 某个维度卸载时清掉它的结构缓存（LumenHome 持有 ServerLevel 引用，不能跨存档留着）。 */
+    public static void invalidate(net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension) {
+        String prefix = dimension.location() + "@";
+        CACHE.keySet().removeIf(key -> key.startsWith(prefix));
     }
 
     public BlockPos toWorld(int[] local) {
@@ -234,10 +230,6 @@ public final class LumenHome {
             return null;
         }
         return zero.offset(rotate(rot, new int[]{x, y, z}));
-    }
-
-    public List<BlockPos> doorLeaves() {
-        return solve() ? List.copyOf(doorLeaves) : List.of();
     }
 
     public List<BlockPos> singleLeaves() {

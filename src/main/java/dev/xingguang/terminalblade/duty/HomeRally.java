@@ -15,6 +15,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 import java.util.ArrayDeque;
@@ -59,10 +60,33 @@ public final class HomeRally {
         if (!(event.getLevel() instanceof ServerLevel level)) {
             return;
         }
-        HomeDoors.tick(level);
-        if (level.getGameTime() % CHECK_INTERVAL != 0) {
-            return;
+        try {
+            HomeDoors.tick(level);
+            if (level.getGameTime() % CHECK_INTERVAL == 0) {
+                tick(level);
+            }
+        } catch (RuntimeException e) {
+            // 门/集结逻辑绝不能把服务端 tick 打崩（2.8.5 有过一次 NPE 教训）。
+            if (TICK_FAILURES++ % 20 == 0) {
+                TerminalBlade.LOGGER.error("[流明·星] 家里袭击的门/集结逻辑异常，已跳过本 tick", e);
+            }
         }
+    }
+
+    /** 维度卸载：清掉静态状态，避免继续持有已卸载的 ServerLevel 与陈旧缓存。 */
+    @SubscribeEvent
+    public static void onLevelUnload(LevelEvent.Unload event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            RALLIED.remove(level.dimension());
+            NEXT_MOVE.clear();
+            RALLY_TARGET.clear();
+            LumenHome.invalidate(level.dimension());
+        }
+    }
+
+    private static int TICK_FAILURES = 0;
+
+    private static void tick(ServerLevel level) {
         Set<Integer> active = new HashSet<>();
         for (ServerPlayer player : level.players()) {
             Raid raid = CompanionDuty.raid(level, player.blockPosition());

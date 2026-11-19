@@ -116,9 +116,7 @@ public class LumenSeishinEntity extends PathfinderMob implements GeoAnimatable, 
     private static final double FROST_CONE_DEGREES = 100.0D;
     private static final long FROST_COOLDOWN = 240L;
 
-    /** 暮色斩星：一次 25% 最大生命值，前摇 1.2 秒，冷却 15 秒。 */
-    private static final float SLASH_RATIO = 0.25F;
-    /** 暮色的斩星翻倍到 50% 目标最大生命。 */
+    /** 暮色斩星：目标最大生命的 60%。 */
     private static final float SLASH_RATIO_MISTLETOE = 0.60F;
     /** 朝露 / 初雪的斩星是固定值（与这两段的固定普攻保持一致）。 */
     private static final float SLASH_FLAT_DAWN = 20.0F;
@@ -127,9 +125,6 @@ public class LumenSeishinEntity extends PathfinderMob implements GeoAnimatable, 
     private static final float DAWN_LIFESTEAL = 3.0F;
     private static final long SLASH_WINDUP = 24L;
     private static final long SLASH_COOLDOWN = 300L;
-    private static final double SLASH_HIT_RANGE = 8.0D;
-    private static final double SLASH_CONE_DEGREES = 120.0D;
-    private static final double MELEE_HIT_RANGE = 4.25D;
 
     /** 朝露回血：每次 10，整场最多 30，冷却 10 秒。 */
     private static final float HEAL_AMOUNT = 20.0F;

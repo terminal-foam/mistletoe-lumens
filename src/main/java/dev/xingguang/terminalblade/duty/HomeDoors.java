@@ -99,10 +99,6 @@ public final class HomeDoors {
         }
     }
 
-    public static boolean isManaged(ServerLevel level, BlockPos lower) {
-        return DOORS.containsKey(Key.of(level, lower));
-    }
-
     public static int managedCount(ServerLevel level) {
         int n = 0;
         for (Key k : DOORS.keySet()) {

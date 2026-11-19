@@ -1,6 +1,6 @@
 # 槲寄生 流光
 
-**Mistletoe Lumens** · Minecraft 1.21.1 / NeoForge
+**Mistletoe Lumens** · v3.0.0 · Minecraft 1.21.1 / NeoForge
 
 一个 [SlashBlade: Resharped](https://modrinth.com/mod/slashblade-resharped) 附属模组：三把原创拔刀剑、一位可挑战的 Boss「流明·星」、会认床会驻守的随从、五个群系的村庄哨所、流明的商店与流明灯。
 
