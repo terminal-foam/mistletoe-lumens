@@ -89,9 +89,10 @@ public final class VillageGuardPosts {
             builder.addPiece(new PoolElementStructurePiece(
                     context.structureTemplateManager(), element, anchor,
                     element.getGroundLevelDelta(), rotation, box, LiquidSettings.APPLY_WATERLOGGING));
-            TerminalBlade.LOGGER.debug("[流明·星] 村庄附加哨所 {} 入口={} 旋转={}", biome, entrance, rotation);
+            TerminalBlade.LOGGER.info("[流明·星] 村庄附加哨所 {} 入口={} 旋转={}", biome, entrance, rotation);
             return new Structure.GenerationStub(stub.position(), Either.right(builder));
         }
+        TerminalBlade.LOGGER.debug("[流明·星] 村庄四个方向都放不下哨所（包围盒={}）", village);
         return null;
     }
 
