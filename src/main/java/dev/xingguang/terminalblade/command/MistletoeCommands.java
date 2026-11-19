@@ -12,6 +12,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
@@ -55,6 +56,9 @@ public final class MistletoeCommands {
                                                 FloatArgumentType.getFloat(ctx, "target_max"),
                                                 FloatArgumentType.getFloat(ctx, "player_current"),
                                                 FloatArgumentType.getFloat(ctx, "player_max"))))));
+        // 排查「家里的袭击」：结构定位、坐标反推、住户、门、三个大厅点
+        var home = Commands.literal("home")
+                .executes(ctx -> homeStatus(ctx.getSource()));
         event.getDispatcher().register(Commands.literal("mistletoe")
                 .requires(source -> source.hasPermission(2))
                 .then(give)
@@ -62,12 +66,12 @@ public final class MistletoeCommands {
                 .then(giveFirstSnow)
                 .then(boss)
                 .then(shop)
-                .then(audit));
+                .then(audit)
+                .then(home));
     }
 
     /** `/mistletoe shop`：打印当前玩家对最近一只流明的商店进度。 */
-    private static int shopStatus(net.minecraft.commands.CommandSourceStack source) {
-        ServerPlayer player;
+    private static int shopStatus(net.minecraft.commands.CommandSourceStack source) {        ServerPlayer player;
         try {
             player = source.getPlayerOrException();
         } catch (Exception e) {
@@ -85,6 +89,30 @@ public final class MistletoeCommands {
         String line = dev.xingguang.terminalblade.trade.LumenStanding.describe(
                 player, boss.getUUID());
         source.sendSuccess(() -> Component.literal("§b[流明·星]§r " + line), false);
+        return 1;
+    }
+
+    /** `/mistletoe home`：排查「家里的袭击」——结构定位、坐标反推、住户、门、大厅点。 */
+    private static int homeStatus(net.minecraft.commands.CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        var home = dev.xingguang.terminalblade.duty.LumenHome.at(level, at);
+        if (home == null) {
+            source.sendFailure(Component.literal("当前位置不在 mistletoe:lumen_home 结构内。"));
+            return 0;
+        }
+        var lines = new java.util.ArrayList<String>();
+        lines.addAll(home.describe());
+        var doors = dev.xingguang.terminalblade.duty.HomeDoors.managedCount(level);
+        lines.add("模组接管的门：" + doors);
+        var diag = dev.xingguang.terminalblade.duty.HomeRally.diagnose(level, home);
+        if (!diag.isEmpty()) {
+            lines.add("住户 → 房间门：");
+            diag.forEach((name, door) -> lines.add("  " + name + " → " + door));
+        }
+        for (String line : lines) {
+            source.sendSuccess(() -> Component.literal("§b[流明·星]§r " + line), false);
+        }
         return 1;
     }
 

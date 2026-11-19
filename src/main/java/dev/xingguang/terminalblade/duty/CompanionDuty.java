@@ -68,6 +68,8 @@ public final class CompanionDuty {
     }
     public static boolean eligible(LumenCompanionEntity mob, LivingEntity target) {
         if (target==null || target==mob || !target.isAlive() || target.level()!=mob.level() || mob.isSleeping()) return false;
+        // 流明阵营内部不互相索敌（随从↔随从、随从↔流明），防止范围攻击结仇后互殴。
+        if (target instanceof LumenCompanionEntity || target instanceof LumenSeishinEntity) return false;
         if (data(mob).hasUUID("Leader")) {
             var id=data(mob).getUUID("Leader");
             if (id.equals(target.getUUID()) || target instanceof LumenCompanionEntity other

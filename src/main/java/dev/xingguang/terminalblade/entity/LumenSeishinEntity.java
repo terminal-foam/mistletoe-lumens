@@ -1157,6 +1157,16 @@ public class LumenSeishinEntity extends PathfinderMob implements GeoAnimatable, 
         return dev.xingguang.terminalblade.duty.RaidRelief.marked(this);
     }
 
+    /** 同类（随从/流明）之间不产生伤害：范围攻击蹭到同伴也不会结仇互殴。 */
+    @Override
+    public boolean isInvulnerableTo(DamageSource source) {
+        Entity src = source.getEntity() != null ? source.getEntity() : source.getDirectEntity();
+        if (src instanceof LumenCompanionEntity || src instanceof LumenSeishinEntity) {
+            return true;
+        }
+        return super.isInvulnerableTo(source);
+    }
+
     @Override
     public boolean hurt(DamageSource source, float amount) {
         if (isReliefLeader() && source.getEntity() instanceof Player) {

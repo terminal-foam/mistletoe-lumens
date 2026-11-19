@@ -1,6 +1,7 @@
 package dev.xingguang.terminalblade.duty;
 
 import dev.xingguang.terminalblade.TerminalBlade;
+import dev.xingguang.terminalblade.TerminalBladeConfig;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.raid.Raid;
@@ -21,6 +22,9 @@ public final class RaidReliefDirector {
 
     @SubscribeEvent
     public static void onTick(LevelTickEvent.Post event) {
+        if (!TerminalBladeConfig.reliefAutoDispatch()) {
+            return; // 自动支援被关掉时完全不介入（手动举流明灯仍可用）
+        }
         if (!(event.getLevel() instanceof ServerLevel level)) {
             return;
         }

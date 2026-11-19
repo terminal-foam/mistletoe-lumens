@@ -166,9 +166,190 @@ def unpack_states(words, palette_size, volume):
     return out
 
 
+# ── 每个群系的建筑几何（不同群系可以是完全不同的投影与朝向）──────────
+# src 是投影文件名（相对 --src-dir）；entrance 是门口最外一格的台阶（放 jigsaw），
+# marker 是门内一格（守卫站这里）；orientation 必须指向**门外**方向。
+BIOME_SPECS = {
+    # 平原（2026-11-19 重制版）：9×19×19，主入口在北端，门外一格就是橡木台阶。
+    "plains": {
+        "src": "plains.litematic",
+        "entrance": (4, 0, 0),
+        "marker": (4, 1, 2),
+        "orientation": "north_up",       # 门朝 -z（北）
+        "final_state": "minecraft:oak_stairs"
+                       "[facing=south,half=bottom,shape=straight,waterlogged=false]",
+    },
+    "snowy": {
+        "src": "snow.litematic",
+        "entrance": (0, 0, 4),
+        "marker": (2, 1, 4),
+        "orientation": "west_up",        # 门朝 -x（西）
+        "final_state": "minecraft:spruce_stairs"
+                       "[facing=east,half=bottom,shape=straight,waterlogged=false]",
+    },
+    # 针叶林：19×19×7，主入口在东侧的**石砌门廊** ((17,1,3) facing=west)。
+    # 门廊地面 (18,0,3) 正好是最外一格的圆石台阶，jigsaw 放这里，街道接在 y=0。
+    "taiga": {
+        "src": "04.litematic",
+        "entrance": (18, 0, 3),
+        "marker": (16, 1, 3),
+        "orientation": "east_up",        # 门朝 +x（东）
+        "final_state": "minecraft:cobblestone",
+    },
+    # 热带草原：21×19×11，主入口在东侧 ((19,1,5) facing=west)，门外没有台阶，
+    # 门正下方 (19,0,5) 是承重原木；jigsaw 放这格、final_state 还原原木，街道接在 y=0。
+    "savanna": {
+        "src": "idk_how_to_spell.litematic",
+        "entrance": (19, 0, 5),
+        "marker": (18, 1, 5),
+        "orientation": "east_up",        # 门朝 +x（东）
+        "final_state": "minecraft:acacia_log[axis=y]",
+    },
+    # 沙漠：17×19×7，门直接开在西侧边界上（(0,1,3) facing=east），没有外置台阶。
+    # 为了让街道接在**地面高度**（村庄街道 y=0），jigsaw 放在门正下方那格，final_state 还原地板。
+    "desert": {
+        "src": "desert.litematic",
+        "entrance": (0, 0, 3),
+        "marker": (1, 1, 3),
+        "orientation": "west_up",        # 门朝 -x（西）
+        "final_state": "minecraft:smooth_sandstone",
+    },
+}
+
+
+def load_region(path):
+    root = load_root(path)
+    region = list(root["Regions"].values())[0]
+    size = region["Size"]
+    sx, sy, sz = size["x"], size["y"], size["z"]
+    palette = region["BlockStatePalette"]
+    states = unpack_states(region["BlockStates"], len(palette), sx * sy * sz)
+    return root, region, sx, sy, sz, palette, states
+
+
+def conv(v):
+    if isinstance(v, bool):
+        return (1, 1 if v else 0)
+    if isinstance(v, int):
+        return (3, v)
+    if isinstance(v, float):
+        return (6, v)
+    if isinstance(v, str):
+        return (8, v)
+    if isinstance(v, list):
+        if not v:
+            return (9, (8, []))
+        if all(isinstance(i, int) and not isinstance(i, bool) for i in v):
+            return (9, (3, v))
+        if all(isinstance(i, float) for i in v):
+            return (9, (6, v))
+        if all(isinstance(i, str) for i in v):
+            return (9, (8, v))
+        if all(isinstance(i, dict) for i in v):
+            return (9, (10, [conv_dict(i) for i in v]))
+        return (9, (8, [str(i) for i in v]))
+    if isinstance(v, dict):
+        return (10, conv_dict(v))
+    return (8, str(v))
+
+
+def conv_dict(d):
+    return OrderedDict((k, conv(v)) for k, v in d.items() if not k.startswith("_"))
+
+
+def build_biome(biome, spec, src, out_dir, name):
+    root, region, sx, sy, sz, palette, states = load_region(src)
+    print("  [%s] src=%s  size=(%d,%d,%d)  palette=%d  cells=%d"
+          % (biome, os.path.basename(src), sx, sy, sz, len(palette), len(states)))
+    print("      source MinecraftDataVersion = %s" % root.get("MinecraftDataVersion"))
+
+    def idx(n):
+        x = n % sx
+        z = (n // sx) % sz
+        y = n // (sx * sz)
+        return x, y, z
+
+    def cell(x, y, z):
+        return x + z * sx + y * sx * sz
+
+    entrance, marker = tuple(spec["entrance"]), tuple(spec["marker"])
+    for (px, py, pz), what in ((entrance, "jigsaw"), (marker, "marker")):
+        if not (0 <= px < sx and 0 <= py < sy and 0 <= pz < sz):
+            raise SystemExit("[%s] %s 坐标 %s 超出结构范围 (%d,%d,%d)"
+                             % (biome, what, (px, py, pz), sx, sy, sz))
+        cur = palette[states[cell(px, py, pz)]]["Name"]
+        print("      %-6s @ %s  currently = %s" % (what, (px, py, pz), cur))
+
+    out_palette = []
+    for st in palette:
+        d = OrderedDict()
+        d["Name"] = (8, st["Name"])
+        props = st.get("Properties")
+        if props:
+            d["Properties"] = (10, OrderedDict((k, (8, v)) for k, v in sorted(props.items())))
+        out_palette.append(d)
+
+    jigsaw_idx = len(out_palette)
+    out_palette.append(OrderedDict([
+        ("Name", (8, "minecraft:jigsaw")),
+        ("Properties", (10, OrderedDict([("orientation", (8, spec["orientation"]))]))),
+    ]))
+    marker_idx = len(out_palette)
+    out_palette.append(OrderedDict([("Name", (8, MARKER_BLOCK))]))
+
+    te_by_pos = {}
+    for te in region.get("TileEntities", []):
+        te_by_pos[(te.get("x"), te.get("y"), te.get("z"))] = te
+
+    ent_cell = cell(*entrance)
+    mark_cell = cell(*marker)
+    blocks = []
+    for n, s in enumerate(states):
+        x, y, z = idx(n)
+        state = s
+        entry = OrderedDict()
+        entry["pos"] = (9, (3, [x, y, z]))
+        if n == mark_cell:
+            state = marker_idx
+        entry["state"] = (3, state)
+        if n == ent_cell:
+            entry["state"] = (3, jigsaw_idx)
+            entry["nbt"] = (10, OrderedDict([
+                ("final_state", (8, spec["final_state"])),
+                ("name", (8, "minecraft:building_entrance")),
+                ("pool", (8, "minecraft:village/%s/streets" % biome)),
+                ("joint", (8, "aligned")),
+                ("id", (8, "minecraft:jigsaw")),
+                ("target", (8, "minecraft:building_entrance")),
+            ]))
+        else:
+            te = te_by_pos.get((x, y, z))
+            if te is not None:
+                entry["nbt"] = (10, conv_dict(
+                    {k: v for k, v in te.items() if k not in ("x", "y", "z", "keepPacked")}))
+        blocks.append(entry)
+
+    out = OrderedDict()
+    out["DataVersion"] = (3, DATA_VERSION)
+    out["size"] = (9, (3, [sx, sy, sz]))
+    out["palette"] = (9, (10, out_palette))
+    out["blocks"] = (9, (10, blocks))
+    out["entities"] = (9, (10, []))
+
+    nbt_bytes = b"\x0a" + w_str("") + nbt_compound(out)
+    dst = os.path.join(out_dir, "%s_%s.nbt" % (name, biome))
+    with gzip.open(dst, "wb") as f:
+        f.write(nbt_bytes)
+    print("      wrote %s (%d bytes, %d blocks)" % (dst, os.path.getsize(dst), len(blocks)))
+    return dst
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--src", required=True)
+    ap.add_argument("--src", default=None,
+                    help="单个投影文件（覆盖群系默认值，仅用于单群系试跑）")
+    ap.add_argument("--src-dir", default=None,
+                    help="投影所在目录；按 BIOME_SPECS 里的文件名逐个取")
     ap.add_argument("--out", required=True)
     ap.add_argument("--name", default="guard_post")
     ap.add_argument("--biomes", nargs="+", default=DEFAULT_BIOMES,
@@ -182,140 +363,32 @@ def main():
         raise SystemExit("未知群系：%s（可选：%s）" % (" ".join(unknown), " ".join(ALL_BIOMES)))
     if not biomes:
         raise SystemExit("至少要给一个群系")
-
-    root = load_root(args.src)
-    region = list(root["Regions"].values())[0]
-    size = region["Size"]
-    sx, sy, sz = size["x"], size["y"], size["z"]
-    palette = region["BlockStatePalette"]
-    states = unpack_states(region["BlockStates"], len(palette), sx * sy * sz)
-    print("size=(%d,%d,%d) palette=%d cells=%d" % (sx, sy, sz, len(palette), len(states)))
-    print("source MinecraftDataVersion =", root.get("MinecraftDataVersion"))
-
-    def idx(n):
-        x = n % sx
-        z = (n // sx) % sz
-        y = n // (sx * sz)
-        return x, y, z
-
-    def cell(x, y, z):
-        return x + z * sx + y * sx * sz
-
-    # 校验注入点
-    for (px, py, pz), what in ((ENTRANCE, "jigsaw"), (MARKER, "marker")):
-        cur = palette[states[cell(px, py, pz)]]["Name"]
-        print("  %-6s @ %s currently = %s" % (what, (px, py, pz), cur))
-
-    # palette 复制 + 追加
-    out_palette = []
-    for st in palette:
-        d = OrderedDict()
-        d["Name"] = (8, st["Name"])
-        props = st.get("Properties")
-        if props:
-            d["Properties"] = (10, OrderedDict((k, (8, v)) for k, v in sorted(props.items())))
-        out_palette.append(d)
-
-    jigsaw_idx = len(out_palette)
-    out_palette.append(OrderedDict([
-        ("Name", (8, "minecraft:jigsaw")),
-        ("Properties", (10, OrderedDict([("orientation", (8, JIGSAW_ORIENTATION))]))),
-    ]))
-    marker_idx = len(out_palette)
-    out_palette.append(OrderedDict([("Name", (8, MARKER_BLOCK))]))
-
-    # 方块实体
-    te_by_pos = {}
-    for te in region.get("TileEntities", []):
-        te_by_pos[(te.get("x"), te.get("y"), te.get("z"))] = te
-
-    def conv(v):
-        if isinstance(v, bool):
-            return (1, 1 if v else 0)
-        if isinstance(v, int):
-            return (3, v)
-        if isinstance(v, float):
-            return (6, v)
-        if isinstance(v, str):
-            return (8, v)
-        if isinstance(v, list):
-            if not v:
-                return (9, (8, []))
-            if all(isinstance(i, int) and not isinstance(i, bool) for i in v):
-                return (9, (3, v))
-            if all(isinstance(i, float) for i in v):
-                return (9, (6, v))
-            if all(isinstance(i, str) for i in v):
-                return (9, (8, v))
-            if all(isinstance(i, dict) for i in v):
-                return (9, (10, [conv_dict(i) for i in v]))
-            return (9, (8, [str(i) for i in v]))
-        if isinstance(v, dict):
-            return (10, conv_dict(v))
-        return (8, str(v))
-
-    def conv_dict(d):
-        return OrderedDict((k, conv(v)) for k, v in d.items() if not k.startswith("_"))
+    if not args.src and not args.src_dir:
+        raise SystemExit("至少要给 --src-dir（多群系）或 --src（单文件）")
 
     os.makedirs(args.out, exist_ok=True)
-    written = []
-    ent_cell = cell(*ENTRANCE)
-    mark_cell = cell(*MARKER)
-
     for biome in biomes:
-        blocks = []
-        for n, s in enumerate(states):
-            x, y, z = idx(n)
-            state = s
-            entry = OrderedDict()
-            entry["pos"] = (9, (3, [x, y, z]))
-            if n == mark_cell:
-                state = marker_idx
-            entry["state"] = (3, state)
-            if n == ent_cell:
-                # 方块状态必须真的换成 jigsaw，否则方块实体数据会被忽略、连接器不生效
-                entry["state"] = (3, jigsaw_idx)
-                # jigsaw 的连接池指回本群系的街道，村庄才能继续延伸
-                entry["nbt"] = (10, OrderedDict([
-                    ("final_state", (8, JIGSAW_FINAL_STATE)),
-                    ("name", (8, "minecraft:building_entrance")),
-                    ("pool", (8, "minecraft:village/%s/streets" % biome)),
-                    ("joint", (8, "aligned")),
-                    ("id", (8, "minecraft:jigsaw")),
-                    ("target", (8, "minecraft:building_entrance")),
-                ]))
-            else:
-                te = te_by_pos.get((x, y, z))
-                if te is not None:
-                    entry["nbt"] = (10, conv_dict(
-                        {k: v for k, v in te.items() if k not in ("x", "y", "z", "keepPacked")}))
-            blocks.append(entry)
-
-        out = OrderedDict()
-        out["DataVersion"] = (3, DATA_VERSION)
-        out["size"] = (9, (3, [sx, sy, sz]))
-        out["palette"] = (9, (10, out_palette))
-        out["blocks"] = (9, (10, blocks))
-        out["entities"] = (9, (10, []))
-
-        nbt_bytes = b"\x0a" + w_str("") + nbt_compound(out)
-        dst = os.path.join(args.out, "%s_%s.nbt" % (args.name, biome))
-        with gzip.open(dst, "wb") as f:
-            f.write(nbt_bytes)
-        written.append((dst, os.path.getsize(dst)))
-        print("  wrote %s (%d bytes, %d blocks)" % (dst, os.path.getsize(dst), len(blocks)))
+        spec = BIOME_SPECS.get(biome, {
+            "src": None, "entrance": ENTRANCE, "marker": MARKER,
+            "orientation": JIGSAW_ORIENTATION, "final_state": JIGSAW_FINAL_STATE,
+        })
+        src = args.src
+        if not src:
+            if not spec["src"]:
+                raise SystemExit("群系 %s 还没有默认投影，请用 --src 指定" % biome)
+            src = os.path.join(args.src_dir, spec["src"])
+        if not os.path.exists(src):
+            raise SystemExit("找不到投影文件：%s" % src)
+        build_biome(biome, spec, src, args.out, args.name)
 
     # 清理本次没选中的群系结构，避免「模板池里没有它、包里却还留着」
     pattern = os.path.join(args.out, "%s_*.nbt" % args.name)
-    for stale in sorted(glob.glob(pattern)):
-        suffix = os.path.splitext(os.path.basename(stale))[0][len(args.name) + 1:]
-        if suffix not in biomes:
+    keep = {"%s_%s.nbt" % (args.name, b) for b in biomes}
+    for stale in glob.glob(pattern):
+        if os.path.basename(stale) not in keep:
             os.remove(stale)
-            print("  pruned %s（不在本次群系列表里）" % os.path.basename(stale))
+            print("  pruned %s（该群系本次未生成）" % stale)
 
-    non_air = sum(1 for s in states if s != 0)
-    print("\nnon-air blocks in source: %d / %d cells" % (non_air, len(states)))
-    print("entrance jigsaw @ %s, marker %s @ %s" % (ENTRANCE, MARKER_BLOCK, MARKER))
     print("biomes: %s" % " ".join(biomes))
 
 

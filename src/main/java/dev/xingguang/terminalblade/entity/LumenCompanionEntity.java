@@ -689,6 +689,16 @@ public class LumenCompanionEntity extends TamableAnimal implements GeoAnimatable
         return stack.has(net.minecraft.core.component.DataComponents.FOOD);
     }
 
+    /** 同类（随从/流明）之间不产生伤害：范围攻击蹭到同伴也不会结仇互殴。 */
+    @Override
+    public boolean isInvulnerableTo(DamageSource source) {
+        Entity src = source.getEntity() != null ? source.getEntity() : source.getDirectEntity();
+        if (src instanceof LumenCompanionEntity || src instanceof LumenSeishinEntity) {
+            return true;
+        }
+        return super.isInvulnerableTo(source);
+    }
+
     @Override
     public boolean hurt(DamageSource source, float amount) {
         // 临时援军对玩家伤害免疫（袭击者仍可伤害）

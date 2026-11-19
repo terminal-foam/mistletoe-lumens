@@ -29,6 +29,8 @@ public final class TerminalBladeConfig {
     public static final ModConfigSpec.IntValue SUPER_PERSISTENT_TICKS;
     public static final ModConfigSpec.IntValue SUPER_PERSISTENT_INTERVAL;
     public static final ModConfigSpec.BooleanValue LOG_DAMAGE;
+    /** 袭击自动支援开关（默认关闭，只留手动举灯）。 */
+    public static final ModConfigSpec.BooleanValue RELIEF_AUTO_DISPATCH;
 
 
     static {
@@ -104,6 +106,14 @@ public final class TerminalBladeConfig {
         LOG_DAMAGE = builder
                 .comment("在服务端日志打印槲寄生的公式结算，便于对照测试用例。")
                 .define("log_damage", false);
+        builder.pop();
+
+        builder.push("raid_relief");
+        RELIEF_AUTO_DISPATCH = builder
+                .comment("袭击自动支援：达到触发波时自动派 15 人援军（14 随从 + 流明领队）。",
+                        "默认 false = 关闭，只保留玩家主动举流明灯求援。",
+                        "改 true 恢复自动派遣。")
+                .define("auto_dispatch", false);
         builder.pop();
 
         SPEC = builder.build();
@@ -192,5 +202,7 @@ public final class TerminalBladeConfig {
         return LOG_DAMAGE.get();
     }
 
-
+    public static boolean reliefAutoDispatch() {
+        return RELIEF_AUTO_DISPATCH.get();
+    }
 }

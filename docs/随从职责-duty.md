@@ -36,7 +36,27 @@
 
 不再按村庄的钟投放，而是**按「流明哨所」建筑投放：有几座哨所，就有几位无主守卫**，并且直接生成在**建筑内部**。
 
-- 哨所是本模组加进原版村庄的独立建筑（7×19×17 石塔，内有床、箱子、营火和灵魂沙气泡柱电梯），目前**只接入平原（plains）**（2.7.3 按需求移除了草原/savanna）；沙漠 / 雪原 / 针叶林留待后续美术版本，工具已支持 `--biomes` 一键扩展；
+- 哨所是本模组加进原版村庄的独立建筑，**五种原版村庄群系全部接入**：平原（plains）、雪原（snowy）、沙漠（desert）、热带草原（savanna）、针叶林（taiga）：
+
+  | 群系 | 尺寸 (x×y×z) | 入口朝向 | jigsaw 位置 | marker（守卫站位）| 投影来源 |
+  |---|---|---|---|---|---|
+  | plains | 9×19×19 | -z（北）| (4,0,0) `north_up` | (4,1,2) | `plains.litematic`（2026-11-19 重制）|
+  | snowy | 18×17×9 | -x（西）| (0,0,4) `west_up` | (2,1,4) | `snow.litematic` |
+  | desert | 17×19×7 | -x（西）| (0,0,3) `west_up` | (1,1,3) | `desert.litematic` |
+  | savanna | 21×19×11 | +x（东）| (19,0,5) `east_up` | (18,1,5) | `idk_how_to_spell.litematic` |
+  | taiga | 19×19×7 | +x（东）| (18,0,3) `east_up` | (16,1,3) | `04.litematic` |
+
+  五种都有床、箱/桶、营火或熔炉、火把与**灵魂沙气泡柱电梯**；taiga 还把电梯放在西端、东端留了一个带栏杆和火把的**石砌门廊**。
+
+  > taiga 的主入口在东侧门廊（(17,1,3) `facing=west`），门廊地面 (18,0,3) 是最外一格圆石，jigsaw 放这里、`final_state` 还原圆石。
+
+  > savanna 的主入口在**东侧**（(19,1,5) `facing=west`），门正下方 (19,0,5) 是承重原木；jigsaw 放那格、`final_state` 还原原木，街道接在 y=0。
+
+  > 沙漠那份的门直接开在边界上（(0,1,3) `facing=east`），没有外置台阶；为了让街道接在**地面高度**，
+  > jigsaw 放在门正下方 (0,0,3)，`final_state` 还原地板 `smooth_sandstone`。
+
+  工具已改成**按群系各自指定投影与注入点**（`tools/village_guard_post.py --src-dir <投影目录> --biomes plains snowy desert savanna`）；
+
 - 每座哨所内部有一个不可见、无碰撞、不可破坏的锚点方块 `mistletoe:guard_post`，守卫的脚就站在这一格（主厅北门内侧）；
 - 玩家 64 格内发现锚点才处理；`mistletoe_village_guards` 按**锚点坐标**记录（键前缀 `post@`），不会重复投放；
 - 锚点上方被堵住时先不投放，清空后再补；
@@ -45,7 +65,7 @@
 - 不需要 OP 指令。**没有哨所的村庄不会自动出守卫**，可用下面的命令手动登记。
 
 > **兼容性代价**：为了把哨所塞进原版村庄，本模组**覆写**了
-> `data/minecraft/worldgen/template_pool/village/plains/houses.json` 这 1 个文件
+> `data/minecraft/worldgen/template_pool/village/{plains,snowy,desert,savanna,taiga}/houses.json` 这 5 个文件
 > （其余群系保持原版，不覆写）。
 > 1.21.1 的 NeoForge 21.1.248 没有"追加模板池元素"类的 StructureModifier（实测只有
 > AddSpawns / ClearSpawns / RemoveSpawns），数据包层面无法原地追加，只能整体替换。
@@ -93,7 +113,40 @@
 
 袭击达到条件时，自动派遣 **1 位流明·星 + 14 名临时随从**（共 15 人）：
 
-- 触发（2.6.3）：**袭击打到第 4 波**、场上仍有活着的袭击者、玩家在袭击中心 **64 格内**；每场袭击只派一次。不足 4 波的袭击退到最后一波（否则永远等不到）。**用流明灯则立即召唤，不等波数**；
+> **2.8.2 起自动支援默认关闭**。配置项：`config/mistletoe-common.toml` → `[raid_relief] auto_dispatch = false`。
+> 关闭时 `RaidReliefDirector` 完全不介入（不检查、不打日志）；玩家仍可**主动举流明灯求援**（`RaidRelief.call` 不变）。
+> 改 `true` 即恢复下面这套自动触发。
+### 2.8.3 家里的袭击：第一波前的集结（门）
+
+- 只在「袭击中心落在 `mistletoe:lumen_home` 结构内」且 `groupsSpawned == 0`（第一波倒计时）时触发；
+- 住户判定：`Bed` 或 `Anchor` 落在结构内、不是援军单位（`RaidRelief`）、未被玩家收服（`isTame`）；
+- 对每名被关在房间里的住户：有界 flood-fill 找到它所在房间的双扇铁门 → 申请开门 → **再**下达去大厅边缘集结点的寻路指令；
+- 只操作结构自带的 15 组双扇卧室门；按钮、拉杆、另外 4 扇单扇门、玩家后加的门都不碰；
+- 收尾：请求方通过（离门 >8 格）或超时（300 tick）后，按**当时**的 `POWERED` 恢复 —— 有红石供电就保持开着，玩家中途拨开的门不会被强行关回去；
+- 集结没完成不会拖延第一波（袭击照常推进）；
+- 结构坐标反推：用世界里实际存在的铁门去匹配 15 组门的局部坐标，得出「旋转 + 平移」，结果按结构缓存（不依赖 jigsaw piece 的轴心约定）；
+- 诊断命令：`/mistletoe home`（站在家里或传送到家里执行），输出结构范围、坐标反推结果、住户→房间门映射、模组接管的门数、三个大厅点与四个集结点的世界坐标。
+
+
+**2.8.4 修正**：门不再「住客走出 8 格就关」，而是**整场袭击期间由 `raid:<维度>:<id>` 标签持有、保持打开**；等袭击结束（不再有袭击中心落在该家）才统一按当时的 `POWERED` 收尾。15 组双扇卧室门**全部**打开（不论有没有人住）。**2.8.5**：结构自带的 **4 扇单扇门也一起打开**，即家里被袭击时 34 个门叶全开；按钮、拉杆和玩家后加的门仍然不碰。
+
+### 2.8.7 大厅定点刷怪
+
+- `RaidSpawnMixin` 只替换 `Raid.findRandomSpawnPos(int,int)` 的返回位置，整波仍由原版 `spawnGroup` 生成（号角、队长、波数、袭击条、胜负结算都不变，`WaveLog` 记录的也是最终坐标）；
+- 三个点按 `groupsSpawned` 轮换：`(26,1,25)`、`(33,1,30)`、`(22,1,34)`（结构局部坐标，按实际旋转换算成世界坐标）；
+- 选点要求：2×2 底面、3 格净空、脚下实心（劫掠兽 1.95×2.2 也放得下）；
+- 三个点都堵时回退原版刷点，并打一次日志；
+- 预警：波次冷却剩 40 tick 起，每 5 tick 在实际刷点位置画 END_ROD 圈，同时给 96 格内玩家一条 actionbar 提示；圈和刷点用的是同一个选择函数；
+- `RaidCooldownAccessor`：只读 `raidCooldownTicks`，用于预警时机。
+### 2.8.8 阵营内部不互殴
+
+- 原因：双方都在 `targetSelector` 第 1 优先级挂了 `HurtByTargetGoal`，而 `CompanionDuty.eligible()` 对「非驻守随从」直接放行 → 范围攻击（拔刀剑 AOE）蹭到同伴 → 被打的记仇 → 互相打起来；
+- 三层修复：
+  1. `LumenCompanionEntity` / `LumenSeishinEntity` 的 `isInvulnerableTo`：攻击者是同类时直接免疫（不受伤、不击退、不结仇）；
+  2. `LivingEntityCanAttackMixin`：随从/流明之间 `canAttack` 恒为 false（`HurtByTargetGoal` 因此不会选目标）；
+  3. `CompanionDuty.eligible()`：任何情况下都不把随从/流明当作目标，残留目标下一 tick 会被清掉。
+
+- 触发（2.6.3，需 `auto_dispatch = true`）：**袭击打到第 4 波**、场上仍有活着的袭击者、玩家在袭击中心 **64 格内**；每场袭击只派一次。不足 4 波的袭击退到最后一波（否则永远等不到）。**用流明灯则立即召唤，不等波数**；
 - 每场袭击只派遣一次（`mistletoe_lamp_relief`），**15 人按批进场**：`ReliefDispatch` 先准备/校验再插入，中途失败会倒序回滚，绝不会留下半队；
 - 岗位用 `ReliefTactics` 选择，并做**真实寻路可达性检查**：外围不跨扇区、路径不越界、被击退到界外只走逐步向内的归位路径；隔墙不可达的最近目标会被跳过（2.3.8，lamp.2）；
 - 人员与分工：

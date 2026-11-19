@@ -7,6 +7,8 @@
     "SuperSlashArtsMixin",
     "EntitySlashEffectMixin",
     "DutyRaidMixin",
+    "RaidSpawnMixin",
+    "RaidCooldownAccessor",
     "LivingEntityCanAttackMixin"
   ],
   "injectors": {
