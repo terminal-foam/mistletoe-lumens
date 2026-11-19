@@ -1,5 +1,6 @@
 package dev.xingguang.terminalblade.mixin;
 
+import dev.xingguang.terminalblade.TerminalBlade;
 import dev.xingguang.terminalblade.duty.VillageGuardPosts;
 import java.util.Optional;
 import net.minecraft.world.level.levelgen.structure.Structure;
@@ -19,6 +20,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  */
 @Mixin(JigsawStructure.class)
 abstract class VillageGuardPostMixin {
+    private static int CALLS = 0;
+
+    @Inject(method = "findGenerationPoint", at = @At("HEAD"))
+    private void mistletoe$countCalls(Structure.GenerationContext context,
+                                      CallbackInfoReturnable<Optional<Structure.GenerationStub>> cir) {
+        if (++CALLS <= 3 || CALLS % 200 == 0) {
+            TerminalBlade.LOGGER.info("[哨所] findGenerationPoint 第 {} 次调用", CALLS);
+        }
+    }
+
     @Inject(method = "findGenerationPoint", at = @At("RETURN"), cancellable = true)
     private void mistletoe$appendGuardPost(Structure.GenerationContext context,
                                            CallbackInfoReturnable<Optional<Structure.GenerationStub>> cir) {

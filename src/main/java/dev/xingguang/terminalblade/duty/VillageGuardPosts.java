@@ -49,14 +49,21 @@ public final class VillageGuardPosts {
         StructurePiecesBuilder builder = stub.getPiecesBuilder();
         BoundingBox village = builder.getBoundingBox();
         if (village == null) {
+            TerminalBlade.LOGGER.warn("[哨所] 放弃：村庄包围盒为空");
             return null;
         }
         StructurePiece sample = builder.findCollisionPiece(village);
         if (!(sample instanceof PoolElementStructurePiece elementPiece)) {
+            TerminalBlade.LOGGER.warn("[哨所] 放弃：取到的件不是 PoolElementStructurePiece（{}）",
+                    sample == null ? "null" : sample.getClass().getSimpleName());
             return null;
         }
-        String biome = biomeOf(StructurePools.location(elementPiece.getElement()));
+        String location = StructurePools.location(elementPiece.getElement());
+        String biome = biomeOf(location);
         if (biome == null) {
+            if (location != null && location.startsWith("minecraft:village/")) {
+                TerminalBlade.LOGGER.warn("[哨所] 放弃：村庄群系无法识别（{}）", location);
+            }
             return null;
         }
         int midX = (village.minX() + village.maxX()) / 2;
@@ -113,12 +120,14 @@ public final class VillageGuardPosts {
         if (location == null || !location.startsWith("minecraft:village/")) {
             return null;
         }
+        // 元素 id 形如 minecraft:village/plains/town_centers/xxx：
+        // split 后 [0]=minecraft:village，[1]=群系，[2]=池名。
         String[] parts = location.split("/");
-        if (parts.length < 3) {
+        if (parts.length < 2) {
             return null;
         }
         for (String biome : BIOMES) {
-            if (biome.equals(parts[2])) {
+            if (biome.equals(parts[1])) {
                 return biome;
             }
         }
