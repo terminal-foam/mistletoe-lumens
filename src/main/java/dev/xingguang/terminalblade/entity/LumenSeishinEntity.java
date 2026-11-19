@@ -848,6 +848,11 @@ public class LumenSeishinEntity extends PathfinderMob implements GeoAnimatable, 
         // 没被玩家打断：献祭死亡，走正常 hurt 以尊重特殊免疫与锁血标签。
         this.hurt(MistletoeDamage.source(this, MistletoeDamage.SACRIFICE),
                 getHealth() + getMaxHealth());
+        if (this.isAlive()) {
+            // 兜底：被外部免疫挡下时也必须收尾，否则会留下一个“爆发完还在”的 Boss。
+            MistletoeDamage.finish(this, MistletoeDamage.SACRIFICE);
+            TerminalBlade.LOGGER.warn("[流明·星] 献祭被免疫挡下，已强制收尾");
+        }
         TerminalBlade.LOGGER.info("[流明·星] 终局释放");
     }
 
@@ -1160,7 +1165,9 @@ public class LumenSeishinEntity extends PathfinderMob implements GeoAnimatable, 
     @Override
     public boolean isInvulnerableTo(DamageSource source) {
         Entity src = source.getEntity() != null ? source.getEntity() : source.getDirectEntity();
-        if (src instanceof LumenCompanionEntity || src instanceof LumenSeishinEntity) {
+        // 同类互不伤害，但**自己打自己**要放行（终局蓄力的献祭就是自己结算的）。
+        if (src != null && src != this
+                && (src instanceof LumenCompanionEntity || src instanceof LumenSeishinEntity)) {
             return true;
         }
         return super.isInvulnerableTo(source);

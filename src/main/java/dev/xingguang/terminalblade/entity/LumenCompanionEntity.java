@@ -692,7 +692,9 @@ public class LumenCompanionEntity extends TamableAnimal implements GeoAnimatable
     @Override
     public boolean isInvulnerableTo(DamageSource source) {
         Entity src = source.getEntity() != null ? source.getEntity() : source.getDirectEntity();
-        if (src instanceof LumenCompanionEntity || src instanceof LumenSeishinEntity) {
+        // 同类互不伤害，但**自己打自己**要放行（终局蓄力的献祭就是自己结算的）。
+        if (src != null && src != this
+                && (src instanceof LumenCompanionEntity || src instanceof LumenSeishinEntity)) {
             return true;
         }
         return super.isInvulnerableTo(source);
