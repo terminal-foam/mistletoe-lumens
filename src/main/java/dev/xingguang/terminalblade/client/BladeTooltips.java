@@ -26,6 +26,10 @@ public final class BladeTooltips {
         if (key == null) {
             return;
         }
+        // 按住 Shift 才展开介绍（与原版"按住 Shift 查看详情"的习惯一致）。
+        if (!net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+            return;
+        }
         event.getToolTip().add(Component.translatable(key + ".desc").withStyle(ChatFormatting.GRAY));
         // 用法提示只给暮色（朝露/初雪只留描述）。
         if (MistletoeBlade.TRANSLATION_KEY.equals(key)) {
