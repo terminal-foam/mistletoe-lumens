@@ -98,27 +98,36 @@ public final class LumenRespawnHandler {
             return true;
         }
         if (pending.snapshot() != null) {
-            // 还原死亡时的完整状态：职责数据、驻守/床位、血量、名字、朝向都在里面
+            // 还原死亡时的完整状态：职责数据、驻守/床位、名字、朝向都在里面。
+            // 注意：快照是「死亡瞬间」的，Health=0、Motion 可能是坠落速度、可能还带着火，
+            // 直接加载会让它复活即死（之前就是这个 bug），所以下面统一把状态清干净。
             try {
                 entity.load(pending.snapshot());
             } catch (RuntimeException e) {
                 TerminalBlade.LOGGER.warn("[流明·星] 随从 {} 的复活快照无法读取，退回基础属性", petId, e);
             }
+            entity.setHealth(entity.getMaxHealth());
+            entity.setDeltaMovement(0.0D, 0.0D, 0.0D);
+            entity.setRemainingFireTicks(0);
+            entity.fallDistance = 0.0F;
+            entity.hurtTime = 0;
+            entity.deathTime = 0;
+            entity.invulnerableTime = 0;
         }
-        // 重生点可能正好在床上 / 被方块占住：和以前一样，向上找一个能站的位置。
-        double x = respawnPos.getX() + 0.5D;
-        double y = respawnPos.getY() + 0.1D;
-        double z = respawnPos.getZ() + 0.5D;
-        for (int attempt = 0; attempt < 5; attempt++) {
-            BlockPos feet = BlockPos.containing(x, y, z);
-            boolean clear = target.isEmptyBlock(feet)
-                    && target.isEmptyBlock(feet.above())
-                    && !target.isEmptyBlock(feet.below());
-            if (clear) {
-                break;
-            }
-            y += 1.0D;
+        // 重生点可能正好在床上 / 被方块或液体占住：向上找能站的位置；
+        // 重生点实在放不下就退到主人脚下，避免复活进岩浆/虚空再死一次。
+        BlockPos spot = safeSpot(target, respawnPos);
+        if (spot == null) {
+            spot = safeSpot(target, owner.blockPosition());
         }
+        if (spot == null) {
+            TerminalBlade.LOGGER.warn("[流明·星] 随从 {} 找不到安全复活点（重生点={}），继续等待",
+                    petId, respawnPos);
+            return false;
+        }
+        double x = spot.getX() + 0.5D;
+        double y = spot.getY();
+        double z = spot.getZ() + 0.5D;
         entity.moveTo(x, y, z, owner.getYRot(), 0.0F);
         entity.setTame(true, true);
         entity.setOwnerUUID(pending.owner());
@@ -136,5 +145,20 @@ public final class LumenRespawnHandler {
         TerminalBlade.LOGGER.info("[流明·星] 随从在主人重生点复活：{}（快照={}）",
                 respawnPos, pending.snapshot() != null);
         return true;
+    }
+
+    /** 从给定位置向上找 12 格内能站人的位置；找不到返回 null。 */
+    private static BlockPos safeSpot(ServerLevel level, BlockPos from) {
+        if (from == null) {
+            return null;
+        }
+        for (int dy = 0; dy < 12; dy++) {
+            BlockPos feet = from.above(dy);
+            if (level.isEmptyBlock(feet) && level.isEmptyBlock(feet.above())
+                    && !level.isEmptyBlock(feet.below())) {
+                return feet;
+            }
+        }
+        return null;
     }
 }
