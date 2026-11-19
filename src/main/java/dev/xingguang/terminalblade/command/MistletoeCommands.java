@@ -118,7 +118,7 @@ public final class MistletoeCommands {
                         String id = elementId(e);
                         return id != null && id.contains("guard_post");
                     }).count();
-                    line += "条目=" + total + " 哨所=" + guard;
+                    line += "房屋池=" + total + " 池内哨所=" + guard + "（哨所已改为生成时附加，池内应为 0）";
                 }
             } catch (RuntimeException e) {
                 line += "读取失败 " + e;

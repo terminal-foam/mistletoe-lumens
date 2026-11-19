@@ -9,7 +9,8 @@
     "DutyRaidMixin",
     "RaidSpawnMixin",
     "RaidCooldownAccessor",
-    "LivingEntityCanAttackMixin"
+    "LivingEntityCanAttackMixin",
+    "VillageGuardPostMixin"
   ],
   "injectors": {
     "defaultRequire": 1
