@@ -27,6 +27,9 @@ public final class BladeTooltips {
             return;
         }
         event.getToolTip().add(Component.translatable(key + ".desc").withStyle(ChatFormatting.GRAY));
-        event.getToolTip().add(Component.translatable(key + ".hint").withStyle(ChatFormatting.DARK_GRAY));
+        // 用法提示只给暮色（朝露/初雪只留描述）。
+        if (MistletoeBlade.TRANSLATION_KEY.equals(key)) {
+            event.getToolTip().add(Component.translatable(key + ".hint").withStyle(ChatFormatting.DARK_GRAY));
+        }
     }
 }
