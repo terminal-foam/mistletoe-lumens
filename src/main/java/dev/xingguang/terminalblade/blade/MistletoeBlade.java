@@ -30,6 +30,16 @@ public final class MistletoeBlade {
                 .withStyle(style -> style.withItalic(false));
     }
 
+    /** 三把刀（暮色/朝露/初雪）各自的翻译键；不是本模组的刀返回 null。 */
+    public static String bladeTranslationKey(ItemStack stack) {
+        return BladeStateAccess.of(stack)
+                .map(state -> {
+                    String key = state.getTranslationKey();
+                    return BLADE_KEYS.contains(key) || FIRST_SNOW_TRANSLATION_KEY.equals(key) ? key : null;
+                })
+                .orElse(null);
+    }
+
     public static boolean isMistletoe(ItemStack stack) {
         return BladeStateAccess.of(stack)
                 .map(state -> BLADE_KEYS.contains(state.getTranslationKey()))

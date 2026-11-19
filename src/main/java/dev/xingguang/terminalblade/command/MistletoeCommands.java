@@ -59,6 +59,9 @@ public final class MistletoeCommands {
         // 排查「家里的袭击」：结构定位、坐标反推、住户、门、三个大厅点
         var home = Commands.literal("home")
                 .executes(ctx -> homeStatus(ctx.getSource()));
+        // 排查村庄哨所：打印运行时解析后的房屋池条目
+        var pools = Commands.literal("pools")
+                .executes(ctx -> poolStatus(ctx.getSource()));
         event.getDispatcher().register(Commands.literal("mistletoe")
                 .requires(source -> source.hasPermission(2))
                 .then(give)
@@ -67,7 +70,8 @@ public final class MistletoeCommands {
                 .then(boss)
                 .then(shop)
                 .then(audit)
-                .then(home));
+                .then(home)
+                .then(pools));
     }
 
     /** `/mistletoe shop`：打印当前玩家对最近一只流明的商店进度。 */
@@ -90,6 +94,62 @@ public final class MistletoeCommands {
                 player, boss.getUUID());
         source.sendSuccess(() -> Component.literal("§b[流明·星]§r " + line), false);
         return 1;
+    }
+
+    /** `/mistletoe pools`：打印运行时解析后的五个村庄房屋池，确认哨所条目真的进了池子。 */
+    private static int poolStatus(net.minecraft.commands.CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        var lookup = level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.TEMPLATE_POOL);
+        var server = source.getServer();
+        for (String biome : java.util.List.of("plains", "snowy", "desert", "savanna", "taiga")) {
+            String line = "§b[流明·星]§r " + biome + "：";
+            try {
+                var key = net.minecraft.resources.ResourceKey.create(
+                        net.minecraft.core.registries.Registries.TEMPLATE_POOL,
+                        net.minecraft.resources.ResourceLocation.withDefaultNamespace("village/" + biome + "/houses"));
+                var holder = lookup.get(key).orElse(null);
+                if (holder == null) {
+                    line += "池子不存在";
+                } else {
+                    var pool = holder.value();
+                    var templates = pool.getShuffledTemplates(net.minecraft.util.RandomSource.create(1234L));
+                    int total = templates.size();
+                    long guard = templates.stream().filter(e -> {
+                        String id = elementId(e);
+                        return id != null && id.contains("guard_post");
+                    }).count();
+                    line += "条目=" + total + " 哨所=" + guard;
+                }
+            } catch (RuntimeException e) {
+                line += "读取失败 " + e;
+            }
+            String templateId = "village/guard_post_" + biome;
+            boolean exists = server.getStructureManager()
+                    .get(dev.xingguang.terminalblade.TerminalBlade.id(templateId)).isPresent();
+            line += " 模板" + (exists ? "存在" : "缺失");
+            String finalLine = line;
+            source.sendSuccess(() -> net.minecraft.network.chat.Component.literal(finalLine), false);
+        }
+        return 1;
+    }
+
+    /** 反射取 single_pool_element 的模板 id（诊断专用）。 */
+    private static String elementId(net.minecraft.world.level.levelgen.structure.pools.StructurePoolElement element) {
+        if (!(element instanceof net.minecraft.world.level.levelgen.structure.pools.SinglePoolElement)) {
+            return null;
+        }
+        try {
+            var field = net.minecraft.world.level.levelgen.structure.pools.SinglePoolElement.class
+                    .getDeclaredField("template");
+            field.setAccessible(true);
+            Object value = field.get(element);
+            if (value instanceof com.mojang.datafixers.util.Either<?, ?> either) {
+                return either.left().map(Object::toString).orElse(null);
+            }
+        } catch (Throwable ignored) {
+            // 反射失败就当读不到
+        }
+        return null;
     }
 
     /** `/mistletoe home`：排查「家里的袭击」——结构定位、坐标反推、住户、门、大厅点。 */
