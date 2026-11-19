@@ -68,9 +68,12 @@ public final class VillageGuardPosts {
                 {midX, village.maxZ() + MARGIN, 2}, // 南：门朝北
                 {midX, village.minZ() - MARGIN, 3}  // 北：门朝南
         };
-        for (int[] side : sides) {
+        String[] reasons = new String[4];
+        for (int i = 0; i < sides.length; i++) {
+            int[] side = sides[i];
             BlockPos entrance = surface(context, side[0], side[1]);
             if (entrance == null) {
+                reasons[i] = "水面/高度失败@" + side[0] + "," + side[1];
                 continue;
             }
             Rotation rotation = facingRotation(side[2]);
@@ -82,17 +85,26 @@ public final class VillageGuardPosts {
                     entrance.getZ() - rotated.getZ());
             GuardPostElement element = new GuardPostElement(
                     TerminalBlade.id("village/guard_post_" + biome), emptyProcessors(context));
-            BoundingBox box = element.getBoundingBox(context.structureTemplateManager(), anchor, rotation);
+            BoundingBox box;
+            try {
+                box = element.getBoundingBox(context.structureTemplateManager(), anchor, rotation);
+            } catch (RuntimeException e) {
+                reasons[i] = "模板读取失败:" + e.getClass().getSimpleName();
+                continue;
+            }
             if (builder.findCollisionPiece(box) != null) {
+                reasons[i] = "与村庄碰撞 锚点=" + anchor + " 盒=" + box;
                 continue;
             }
             builder.addPiece(new PoolElementStructurePiece(
                     context.structureTemplateManager(), element, anchor,
                     element.getGroundLevelDelta(), rotation, box, LiquidSettings.APPLY_WATERLOGGING));
-            TerminalBlade.LOGGER.info("[流明·星] 村庄附加哨所 {} 入口={} 旋转={}", biome, entrance, rotation);
+            TerminalBlade.LOGGER.info("[哨所] {} 附加成功 入口={} 锚点={} 旋转={} 盒={}",
+                    biome, entrance, anchor, rotation, box);
             return new Structure.GenerationStub(stub.position(), Either.right(builder));
         }
-        TerminalBlade.LOGGER.debug("[流明·星] 村庄四个方向都放不下哨所（包围盒={}）", village);
+        TerminalBlade.LOGGER.warn("[哨所] {} 四方向均失败 村庄盒={} 原因: 东[{}] 西[{}] 南[{}] 北[{}]",
+                biome, village, reasons[0], reasons[1], reasons[2], reasons[3]);
         return null;
     }
 
