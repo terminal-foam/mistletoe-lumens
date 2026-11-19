@@ -1,11 +1,13 @@
 package dev.xingguang.terminalblade.entity;
 
 import dev.xingguang.terminalblade.TerminalBlade;
+import dev.xingguang.terminalblade.duty.RaidRelief;
 import dev.xingguang.terminalblade.registry.ModEntities;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -25,7 +27,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * {@code getRespawnPosition()} / {@code getRespawnDimension()}；主人没设重生点就落在主人脚下。
  * 主人不在线时保持等待。</p>
  *
- * <p>待复活队列持久化在 {@link LumenRespawnData}（世界存档），关档/重启不会丢。</p>
+ * <p>待复活队列持久化在 {@link LumenRespawnData}（世界存档），关档/重启不会丢。
+ * 每只随从单独一条记录，并保存死亡时的完整实体 NBT，复活后职责（驻守/床位/门绑定）与血量都还在。</p>
  */
 @EventBusSubscriber(modid = TerminalBlade.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
 public final class LumenRespawnHandler {
@@ -42,14 +45,19 @@ public final class LumenRespawnHandler {
         if (!pet.isTame()) {
             return;
         }
+        // 临时援军单位不进复活队列：它们不是玩家的宠物，死亡就结束。
+        if (RaidRelief.marked(pet)) {
+            return;
+        }
         UUID owner = pet.getOwnerUUID();
         MinecraftServer server = pet.level().getServer();
         if (owner == null || server == null) {
             return;
         }
-        LumenRespawnData.get(server).add(owner,
+        CompoundTag snapshot = pet.saveWithoutId(new CompoundTag());
+        LumenRespawnData.get(server).add(pet.getUUID(), owner,
                 pet.level().getGameTime() + RESPAWN_DELAY_TICKS,
-                pet.getName().getString());
+                pet.getName().getString(), snapshot);
     }
 
     @SubscribeEvent
@@ -67,11 +75,11 @@ public final class LumenRespawnHandler {
         }
     }
 
-    private static boolean tryRespawn(MinecraftServer server, UUID ownerId, LumenRespawnData.Entry pending) {
+    private static boolean tryRespawn(MinecraftServer server, UUID petId, LumenRespawnData.Entry pending) {
         if (server.overworld().getGameTime() < pending.dueTick()) {
             return false;
         }
-        ServerPlayer owner = server.getPlayerList().getPlayer(ownerId);
+        ServerPlayer owner = server.getPlayerList().getPlayer(pending.owner());
         if (owner == null) {
             // 主人不在线：等他回来再重生
             return false;
@@ -89,7 +97,15 @@ public final class LumenRespawnHandler {
         if (entity == null) {
             return true;
         }
-        // 重生点可能正好在床上 / 被方块占住：和 Boss 生成随从时一样，向上找一个能站的位置。
+        if (pending.snapshot() != null) {
+            // 还原死亡时的完整状态：职责数据、驻守/床位、血量、名字、朝向都在里面
+            try {
+                entity.load(pending.snapshot());
+            } catch (RuntimeException e) {
+                TerminalBlade.LOGGER.warn("[流明·星] 随从 {} 的复活快照无法读取，退回基础属性", petId, e);
+            }
+        }
+        // 重生点可能正好在床上 / 被方块占住：和以前一样，向上找一个能站的位置。
         double x = respawnPos.getX() + 0.5D;
         double y = respawnPos.getY() + 0.1D;
         double z = respawnPos.getZ() + 0.5D;
@@ -105,16 +121,20 @@ public final class LumenRespawnHandler {
         }
         entity.moveTo(x, y, z, owner.getYRot(), 0.0F);
         entity.setTame(true, true);
-        entity.setOwnerUUID(ownerId);
-        entity.setCustomName(Component.literal(pending.name()));
-        var maxHealth = entity.getAttribute(Attributes.MAX_HEALTH);
-        if (maxHealth != null) {
-            maxHealth.setBaseValue(LumenCompanionEntity.MAX_HEALTH);
+        entity.setOwnerUUID(pending.owner());
+        if (pending.snapshot() == null) {
+            // 旧档迁移记录：没有快照，只能按默认属性重建
+            entity.setCustomName(Component.literal(pending.name()));
+            var maxHealth = entity.getAttribute(Attributes.MAX_HEALTH);
+            if (maxHealth != null) {
+                maxHealth.setBaseValue(LumenCompanionEntity.MAX_HEALTH);
+            }
+            entity.setHealth(LumenCompanionEntity.MAX_HEALTH);
         }
-        entity.setHealth(LumenCompanionEntity.MAX_HEALTH);
         target.addFreshEntity(entity);
         owner.sendSystemMessage(Component.translatable("entity.mistletoe.lumen_companion.respawned"));
-        TerminalBlade.LOGGER.info("[流明·星] 随从在主人重生点复活：{}", respawnPos);
+        TerminalBlade.LOGGER.info("[流明·星] 随从在主人重生点复活：{}（快照={}）",
+                respawnPos, pending.snapshot() != null);
         return true;
     }
 }

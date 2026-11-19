@@ -1,84 +1,110 @@
 # 槲寄生 流光
 
-**Mistletoe Lumens**
+**Mistletoe Lumens** · Minecraft 1.21.1 / NeoForge
 
-Minecraft 1.21.1 / NeoForge 附属模组。它加三把原创拔刀剑「槲寄生『暮色』」「槲寄生『朝露』」和「槲寄生『初雪』」，依赖 [SlashBlade: Resharped](https://modrinth.com/mod/slashblade-resharped) 2.0.7–2.1.9（主目标 2.1.9），不修改、不重新打包本体。
+一个 [SlashBlade: Resharped](https://modrinth.com/mod/slashblade-resharped) 附属模组：三把原创拔刀剑、一位可挑战的 Boss「流明·星」、会认床会驻守的随从、五个群系的村庄哨所、流明的商店与流明灯。
 
-主题来自巴德尔神话里的槲寄生：平时克制，面对越庞大的生命，切口越深。Super SA 以自己的大部分生命换一次球形即死。
+主题来自巴德尔神话里的槲寄生：平时克制，面对越庞大的生命，切口越深。
 
 ## 环境
 
 - Minecraft 1.21.1
-- NeoForge 21.1.228 到 21.2 之前。0.1.2 在 21.1.264 专用服务器上做过启动加载测试
+- NeoForge 21.1.228 到 21.2 之前
 - Java 21
-- SlashBlade: Resharped 接受 `2.0.7-1.21.1` 到 `2.1.9-1.21.1`；开发和 GameTest 基准是 2.1.9
+- SlashBlade: Resharped `2.0.7-1.21.1` 到 `2.1.9-1.21.1`（开发与测试基准 2.1.9）
 
 把本模组 JAR 和 Resharped 放进同一个 `mods` 文件夹。缺少 Resharped 时加载器会直接拒绝启动。
 
-## 怎么拿到刀
+## 内容
 
-- 创造模式：拔刀剑物品栏里的「槲寄生『暮色』」「槲寄生『朝露』」和「槲寄生『初雪』」
-- 命令：`/mistletoe give`（暮色）、`/mistletoe dawn`（朝露）、`/mistletoe first_snow`（初雪）
-- 合成：白鞘拔刀剑居中，上下是发光浆果，左右是铁锭，四角是橡树树叶
+### 三把刀
 
-## 怎么打
+| 刀 | 获得方式 |
+| --- | --- |
+| 槲寄生『暮色』 | `/mistletoe give`、创造模式物品栏、合成（白鞘居中，上下发光浆果，左右铁锭，四角橡树树叶） |
+| 槲寄生『朝露』 | `/mistletoe dawn` |
+| 槲寄生『初雪』 | `/mistletoe first_snow` |
 
-生命值都按 Minecraft 内部 HP 计算，2 HP 等于 1 颗红心。
+### 战斗
+
+生命值按 Minecraft 内部 HP 计算，2 HP = 1 颗红心。
 
 | 操作 | 效果 |
 | --- | --- |
-| 左键连段 | `D0 + k × max(0, 目标最大生命 − 玩家当前生命)`。不献祭。默认 D0 = 5，k = 0.2 |
-| 右键蓄力后松开 | 精准处决。进入动作时不掉血，第 6 个游戏 tick 的命中帧才结算。目标最大生命不超过 100 时不献祭；超过 100 时按献祭后的当前生命计算差额，再附加目标最大生命的 20%，并扣除当前生命的 10% |
-| 长按 V 约 1 秒 | 以身体中心做球形即死，默认半径 16。未锁血目标用无敌穿透伤害结算；范围攻击结算完，再献祭最大生命的 90%。当前生命不够支付时，攻击完成后再死亡。没有目标时仍然献祭 |
+| 左键连段 | `D0 + k × max(0, 目标最大生命 − 玩家当前生命)`，默认 D0 = 5、k = 0.2，不献祭 |
+| 右键蓄力后松开 | 精准处决；目标最大生命 > 100 时按献祭后的当前生命计算差额，再附加目标最大生命的 20%，并扣除当前生命的 10% |
+| 长按 V 约 1 秒 | 以身体中心球形即死（默认半径 16）；未锁血目标用无敌穿透伤害结算，之后献祭最大生命的 90% |
 
-Just 窗口沿用本体，默认没有额外倍率。长按 V 时不要同时潜行并移动，这是本体的输入条件。
+Super SA 会查询 Boss 阶段锁血：锁血目标既不承受无敌穿透伤害，也不会被强制处决。数据包标签 `mistletoe:super_sa_phase_protected` 是未适配 Boss 的保守兜底（默认空）。
 
-Super SA 会先查询 Boss 阶段锁血：锁血目标既不承受无敌穿透伤害，也不会被强制处决。已知 Boss 模组可以注册 `PhaseLockAdapter`；数据包标签 `mistletoe:super_sa_phase_protected` 是未适配 Boss 的保守兜底（默认空）。未适配目标按普通实体处理，可被处决；本模组不声称自动识别任意第三方 Boss 的阶段锁血。
+### 流明·星（Boss）
 
-公式可以用命令复核，三个数分别是目标最大生命、玩家当前生命、玩家最大生命：
+- 分阶段战斗，暮色阶段（MISTLETOE）改用 `mistletoe_lumen_true` 真伤：普攻为目标最大生命的 **25%**，斩星为 **60%**；
+- 终局蓄力：P3 首次掉到 36 HP 触发，蓄力 6 秒、半径 12 格，只执行一次。圈内目标承受 `LUMEN_TRUE` 真伤（**会穿透无敌帧**，这是当前设计），她自己献祭死亡用 `SACRIFICE` 伤害类型，尊重特殊免疫与锁血；
+- 击败后**掉落随从刷怪蛋**（掉落即为唯一获取途径，不自动生成随从）。
 
-```
-/mistletoe audit 300 20 20
-```
+### 随从
 
-服务端配置在 `config/mistletoe-common.toml`。把 `debug.log_damage` 设为 `true` 后，每次结算会写进日志。
+- 认床：自动寻找附近没被村民或其他随从占用的完整床，并用**原版床 POI** 占票（先认先住，村民抢不走）；纸可手动绑床；
+- 驻守：`Guard` + `Anchor` + 半径，白天在范围内巡逻，夜里回床睡觉；
+- 复活：死亡后 200 tick 在主人重生点复活（主人不在线则等待），保存死亡快照，**职责/床位/血量都还原**；同一主人的多只随从各占一条队列记录；
+- 阵营：随从与流明之间互不索敌、互不伤害（范围攻击不会误伤同伴）。
 
-## 本地构建
+### 村庄哨所
+
+五个群系各一种哨所（平原·重制、雪原、沙漠、热带草原、针叶林），以权重 10 注入原版村庄房屋池；每座村庄可生成多个，守卫按哨所数量生成。
+
+> ⚠️ **兼容性**：实现方式是以 `data/minecraft/worldgen/template_pool/village/*/houses.json` 完整覆盖原版文件（内容为 1.21.1 原版 + 本模组条目）。如果整合包里还有其它模组改同一路径，会出现「后加载者覆盖前者」。
+
+### 流明商店
+
+- 17 条交易（后期解锁会替换前期的低价条目），货币是她认的红宝石；
+- 7 个解锁阶段，进度按「玩家 × 流明」各存一份，经验条满后进入下一个世界天（睡觉也算）才进档；
+- 报价按流明自己的 UUID 固定一次，不随玩家波动；
+- 每过一天补货只恢复库存、不改价，每条库存 10 次；
+- 全程不说话。
+
+### 流明灯
+
+放置时是普通光源；举在手里/背包里时作为**动态光源**（提供 `lambdynlights` 数据文件，安装 LambDynamicLights 即可生效，无需额外兼容代码）。
+
+### 家里的袭击
+
+当袭击中心落在 `mistletoe:lumen_home` 结构内时：
+
+- 第一波倒计时起打开结构自带的全部 34 扇铁门，住户从卧室集结到大厅边缘；
+- 每波刷在大厅中央三个固定点之一，波次冷却剩 2 秒起在实际刷点画火花预警圈，三点全堵时回退原版刷点；
+- 袭击结束后门按当时的红石供电状态恢复；
+- **自动援军默认关闭**（`config/mistletoe-common.toml` → `[raid_relief] auto_dispatch = false`）；主动举流明灯求援仍然可用。
+
+## 命令
+
+| 命令 | 作用 |
+| --- | --- |
+| `/mistletoe give` | 给暮色 |
+| `/mistletoe dawn` | 给朝露 |
+| `/mistletoe first_snow` | 给初雪 |
+| `/mistletoe boss` | 在当前位置生成流明·星 |
+| `/mistletoe shop` | 打印商店阶段/经验/等待状态 |
+| `/mistletoe audit <目标最大生命> <玩家当前> <玩家最大>` | 复核伤害公式 |
+| `/mistletoe home` | 诊断「家里的袭击」：结构范围、坐标反推、住户、门、刷怪点与集结点 |
+
+## 构建
+
+两种方式任选：
 
 ```bash
-./gradlew downloadSlashBlade build test
-./gradlew runGameTestServer
+# 标准 Gradle（需要联网拉依赖）
+./gradlew build
+
+# 离线构建脚本（javac + jar，依赖 libs/ 里的 jar）
+powershell -ExecutionPolicy Bypass -File build-1.21.1.ps1 -Clean -Verify
 ```
 
-`test` 只跑 JUnit。`runGameTestServer` 才跑游戏内测试。两套都要通过，不能互相代替。
+产物在 `build-1.21.1/libs/mistletoe-lumens-<版本>.jar`。
 
-`downloadSlashBlade` 会把 Resharped 2.1.9 下载到 `libs/`（编译基准），并核对 SHA-512。这个 JAR 只用于编译和开发运行，不会打进附属模组。
+## 已知限制
 
-本机没有 Gradle 缓存时，可以用离线脚本：
-
-```powershell
-.\build-1.21.1.ps1 -Clean -Verify   # javac + jar，产物在 build-1.21.1\libs
-.\run-tests.ps1                     # JUnit（需要 libs\junit-platform-console-standalone-1.11.4.jar）
-```
-
-1.20.1 Forge 版是独立工程 `port-1.20.1/`（Forge 47.2.0 / Java 17 / SlashBlade 1.1.23），构建与验证结果见 [docs/1.20.1-forge移植验证.md](docs/1.20.1-forge移植验证.md)。
-
-开发客户端：
-
-```bash
-./gradlew runClient
-```
-
-## 这版包含什么
-
-0.1.2 是战斗系统稳定化版本：
-
-- Super SA 改为 `SuperSaExecutionService`：先查阶段锁血，再打无敌穿透伤害；伤害后没死且未锁血才走受控强制处决；死亡事件只在当前强制目标的作用域内解除取消。
-- 删除 `super_slash_art.bypass_invulnerability` / `finish_unyielding` 两个旧开关；默认按上面的规则执行。
-- Super SA 的 ComboState 转换与冷却检查移到扣耐久之前，避免“技能没放出来但耐久已经扣了”。
-- OBJ 补了本体充能渲染需要的 `effect` 组。
-- 斩击来源栈增加服务端 tick 兜底清空，避免异常 tick 污染下一次伤害判定。
-- 新增阶段锁血接口、静态保护标签、处决 GameTest 和耐久顺序测试。
-- 新增槲寄生「朝露」与「初雪」：朝露走固定 12 点熹微 + 再生；初雪是 attack_base 12 的速攻刀，霜刃 7 段高速斩击，攻速 +36.0；两把刀都支持按住左键自动攻击，初雪普攻额外破除目标受击无敌帧；v1.2rc-r3 雪花刀镡、收敛刀鞘和立体流苏已接入。
-
-旧 D-02/D-03 已由 0.1.2 的 Super SA 规则取代；其余未确认项和新增 D-09（耐久附魔）见 `docs/技术决策.md`。0.1.2 已通过 JUnit 12/12、GameTest 27/27 和 NeoForge 21.1.264 专服加载；客户端画面/真人按键验收仍未执行，所以暂不打 `v0.1.2` release tag。
+- 暮色阶段的真伤数值以源码常量为准（`MELEE_MISTLETOE_RATIO = 0.25`、`SLASH_RATIO_MISTLETOE = 0.60`）；
+- 村庄房屋池覆盖方式见上方兼容性说明；
+- 大厅定点刷怪目前不实现「预警点被临时堵住时延迟一波」，只会即时换点或回退原版。
