@@ -3,7 +3,7 @@
 # 背景：本机 %USERPROFILE%\.gradle 缓存已不在，maven.neoforged.net 不可达，
 # gradlew 无法工作；但 envenom 工程留存的 21.1.1 编译基座可用：
 #   E:\dsh\envenom\libs-1.21.1\ 里是 NeoForge 21.1.248 merged + 21.1 服务端库
-# 再加上 libs\SlashBladeResharped-2.1.9-1.21.1.jar 即可编译本模组。
+# 再加上 libs\SlashBladeResharped-2.2.1-1.21.1.jar 即可编译本模组。
 #
 # 用法：
 #   .\build-1.21.1.ps1            # 增量编译 → build-1.21.1\libs\mistletoe-<version>.jar
@@ -24,7 +24,7 @@ $JarTool = Join-Path $JdkHome 'bin\jar.exe'
 
 $root    = $PSScriptRoot
 $libsBase = 'E:\dsh\envenom\libs-1.21.1'
-$slashBladeJar = Join-Path $root 'libs\SlashBladeResharped-2.1.9-1.21.1.jar'
+$slashBladeJar = Join-Path $root 'libs\SlashBladeResharped-2.2.1-1.21.1.jar'
 $build   = Join-Path $root 'build-1.21.1'
 $classes = Join-Path $build 'classes'
 $outDir  = Join-Path $build 'libs'

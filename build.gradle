@@ -76,7 +76,7 @@ tasks.register('downloadSlashBlade') {
         }
         logger.lifecycle('Downloading SlashBlade Resharped {}', project.slashblade_version)
         slashbladeJarFile.parentFile.mkdirs()
-        def url = new URI('https://cdn.modrinth.com/data/8T53F0sy/versions/SA6IKdsb/SlashBladeResharped-2.1.9-1.21.1.jar').toURL()
+        def url = new URI('https://cdn.modrinth.com/data/8T53F0sy/versions/IEvIPjvJ/SlashBladeResharped-2.2.1-1.21.1.jar').toURL()
         url.withInputStream { input ->
             slashbladeJarFile.withOutputStream { output -> output << input }
         }

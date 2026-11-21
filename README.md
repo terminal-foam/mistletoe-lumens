@@ -11,7 +11,7 @@
 - Minecraft 1.21.1
 - NeoForge 21.1.228 到 21.2 之前
 - Java 21
-- SlashBlade: Resharped `2.0.7-1.21.1` 到 `2.1.9-1.21.1`（开发与测试基准 2.1.9）
+- SlashBlade: Resharped `2.0.7-1.21.1` 到 `2.2.1-1.21.1`（开发与测试基准 2.2.1；2.3 之前均兼容）
 
 把本模组 JAR 和 Resharped 放进同一个 `mods` 文件夹。缺少 Resharped 时加载器会直接拒绝启动。
 
