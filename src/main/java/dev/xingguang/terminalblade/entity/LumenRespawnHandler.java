@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
@@ -15,6 +16,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.CampfireBlock;
+import net.minecraft.world.level.block.MagmaBlock;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
@@ -24,15 +27,16 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * 已臣服的随从死亡后，像玩家一样在主人的重生点重生。
  *
  * <p>延迟 {@link #RESPAWN_DELAY_TICKS} tick 后，取主人当前的
- * {@code getRespawnPosition()} / {@code getRespawnDimension()}；主人没设重生点就落在主人脚下。
- * 主人不在线时保持等待。</p>
+ * 先找主人的重生点，找不到安全位置时改到主人当前维度寻找。
+ * 主人离线或本次复活失败时保留记录，每 20 tick 检查一次。</p>
  *
  * <p>待复活队列持久化在 {@link LumenRespawnData}（世界存档），关档/重启不会丢。
- * 每只随从单独一条记录，并保存死亡时的完整实体 NBT，复活后职责（驻守/床位/门绑定）与血量都还在。</p>
+ * 每只随从单独一条记录，复活时从死亡快照还原职责（驻守/床位/门绑定），生命值恢复至上限。</p>
  */
 @EventBusSubscriber(modid = TerminalBlade.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
 public final class LumenRespawnHandler {
     private static final int RESPAWN_DELAY_TICKS = 200;
+    private static final int RETRY_INTERVAL_TICKS = 20;
 
     private LumenRespawnHandler() {
     }
@@ -63,11 +67,14 @@ public final class LumenRespawnHandler {
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         MinecraftServer server = event.getServer();
+        if (server.overworld().getGameTime() % RETRY_INTERVAL_TICKS != 0) {
+            return;
+        }
         LumenRespawnData data = LumenRespawnData.get(server);
         if (data.entries().isEmpty()) {
             return;
         }
-        // 复制一份 key，避免遍历时 remove 触发并发修改
+        // 遍历快照，成功复活的记录可立即从队列移除。
         for (Map.Entry<UUID, LumenRespawnData.Entry> pending : new ArrayList<>(data.entries().entrySet())) {
             if (tryRespawn(server, pending.getKey(), pending.getValue())) {
                 data.remove(pending.getKey());
@@ -86,16 +93,19 @@ public final class LumenRespawnHandler {
         }
 
         ResourceKey<Level> dimension = owner.getRespawnDimension();
-        BlockPos respawnPos = owner.getRespawnPosition();
         ServerLevel target = dimension == null ? null : server.getLevel(dimension);
-        if (target == null || respawnPos == null) {
+        BlockPos spot = target == null ? null : safeSpot(target, owner.getRespawnPosition());
+        if (spot == null) {
             target = owner.serverLevel();
-            respawnPos = owner.blockPosition();
+            spot = safeSpot(target, owner.blockPosition());
+        }
+        if (spot == null) {
+            return false;
         }
 
         LumenCompanionEntity entity = ModEntities.LUMEN_COMPANION.get().create(target);
         if (entity == null) {
-            return true;
+            return false;
         }
         if (pending.snapshot() != null) {
             // 还原死亡时的完整状态：职责数据、驻守/床位、名字、朝向都在里面。
@@ -104,7 +114,7 @@ public final class LumenRespawnHandler {
             try {
                 entity.load(pending.snapshot());
             } catch (RuntimeException e) {
-                TerminalBlade.LOGGER.warn("[流明·星] 随从 {} 的复活快照无法读取，退回基础属性", petId, e);
+                TerminalBlade.LOGGER.debug("[流明·星] 随从 {} 的复活快照无法完整读取", petId, e);
             }
             entity.setHealth(entity.getMaxHealth());
             entity.setDeltaMovement(0.0D, 0.0D, 0.0D);
@@ -113,17 +123,6 @@ public final class LumenRespawnHandler {
             entity.hurtTime = 0;
             entity.deathTime = 0;
             entity.invulnerableTime = 0;
-        }
-        // 重生点可能正好在床上 / 被方块或液体占住：向上找能站的位置；
-        // 重生点实在放不下就退到主人脚下，避免复活进岩浆/虚空再死一次。
-        BlockPos spot = safeSpot(target, respawnPos);
-        if (spot == null) {
-            spot = safeSpot(target, owner.blockPosition());
-        }
-        if (spot == null) {
-            TerminalBlade.LOGGER.warn("[流明·星] 随从 {} 找不到安全复活点（重生点={}），继续等待",
-                    petId, respawnPos);
-            return false;
         }
         double x = spot.getX() + 0.5D;
         double y = spot.getY();
@@ -140,10 +139,11 @@ public final class LumenRespawnHandler {
             }
             entity.setHealth(LumenCompanionEntity.MAX_HEALTH);
         }
-        target.addFreshEntity(entity);
+        if (!target.addFreshEntity(entity)) {
+            return false;
+        }
         owner.sendSystemMessage(Component.translatable("entity.mistletoe.lumen_companion.respawned"));
-        TerminalBlade.LOGGER.info("[流明·星] 随从在主人重生点复活：{}（快照={}）",
-                respawnPos, pending.snapshot() != null);
+        TerminalBlade.LOGGER.info("[流明·星] 随从在 {} 复活（快照={}）", spot, pending.snapshot() != null);
         return true;
     }
 
@@ -154,8 +154,14 @@ public final class LumenRespawnHandler {
         }
         for (int dy = 0; dy < 12; dy++) {
             BlockPos feet = from.above(dy);
-            if (level.isEmptyBlock(feet) && level.isEmptyBlock(feet.above())
-                    && !level.isEmptyBlock(feet.below())) {
+            if (!level.isEmptyBlock(feet) || !level.isEmptyBlock(feet.above())) {
+                continue;
+            }
+            BlockPos below = feet.below();
+            var floor = level.getBlockState(below);
+            if (floor.isFaceSturdy(level, below, Direction.UP)
+                    && !(floor.getBlock() instanceof MagmaBlock)
+                    && !(floor.getBlock() instanceof CampfireBlock)) {
                 return feet;
             }
         }

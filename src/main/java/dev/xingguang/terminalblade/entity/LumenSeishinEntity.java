@@ -1337,6 +1337,10 @@ public class LumenSeishinEntity extends PathfinderMob implements GeoAnimatable, 
 
     /** 按玩家阶段重建货架并打开界面。 */
     private void openShop(ServerPlayer player) {
+        // 像原版村民一样，交易菜单关闭前只接待当前玩家。
+        if (this.getTradingPlayer() != null) {
+            return;
+        }
         if (!(this.level() instanceof net.minecraft.server.level.ServerLevel server)) {
             return;
         }
@@ -1357,11 +1361,13 @@ public class LumenSeishinEntity extends PathfinderMob implements GeoAnimatable, 
         // 必须自己设交易玩家：MerchantMenu 构造器不会调它，缺了这步 stillValid() 立刻为假，
         // 界面会"开一瞬间就关上"（原版流浪商人也是显式调 setTradingPlayer）。
         // 放在 openMenu **之后**：openMenu 关闭旧界面时会触发 removed()→setTradingPlayer(null)。
-        player.openMenu(new net.minecraft.world.SimpleMenuProvider(
+        if (player.openMenu(new net.minecraft.world.SimpleMenuProvider(
                         (id, inv, p) -> new LumenShopMenu(id, inv, this, stage), this.getDisplayName()),
-                buf -> buf.writeVarInt(stage));
+                buf -> buf.writeVarInt(stage)).isEmpty()) {
+            return;
+        }
         this.setTradingPlayer(player);
-        // 原版 openMenu 也会同步交易列表；这里显式再推一次，确保客户端一定拿到
+        // 菜单打开成功后再发送货架。
         this.pushOffers(player);
     }
 
