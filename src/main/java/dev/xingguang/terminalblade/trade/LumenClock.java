@@ -83,6 +83,10 @@ public final class LumenClock extends SavedData {
         if (!(event.getLevel() instanceof ServerLevel level)) {
             return;
         }
+        // 只维护主世界时钟：商店的"第几天"是全局概念，各维度各算一套会让号码对不上。
+        if (!level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)) {
+            return;
+        }
         if (level.getGameTime() % OBSERVE_INTERVAL != 0) {
             return;
         }

@@ -1378,7 +1378,7 @@ public class LumenSeishinEntity extends PathfinderMob implements GeoAnimatable, 
      * 所以睡觉、{@code /time set}、以及两者叠加都会正确触发，不再依赖"开界面那一刻碰巧看到"。</p>
      */
     private void restockIfNewDay(net.minecraft.server.level.ServerLevel server) {
-        long worldDay = dev.xingguang.terminalblade.trade.LumenClock.of(server).daySeq();
+        long worldDay = dev.xingguang.terminalblade.trade.LumenClock.of(server.getServer().overworld()).daySeq();
         if (this.shopDaySeq == Long.MIN_VALUE || worldDay < this.shopDaySeq) {
             // 首次记录，或时钟被重置（新存档/迁移）：只对齐基线
             this.shopDaySeq = worldDay;

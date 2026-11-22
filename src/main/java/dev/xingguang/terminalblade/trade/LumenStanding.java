@@ -1,7 +1,9 @@
 package dev.xingguang.terminalblade.trade;
 
+import dev.xingguang.terminalblade.TerminalBlade;
 import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 
@@ -37,40 +39,68 @@ public final class LumenStanding {
 
     // ── 存储 ────────────────────────────────────────────────────────────
 
-    /** 只读取用：不存在就返回一个临时空标签（不挂到存档里）。 */
-    private static CompoundTag peek(Player player, UUID merchant) {
+    private static String key(Player player, UUID merchant) {
+        return player.getUUID() + "|" + merchant;
+    }
+
+    /**
+     * 把旧版本存在 {@code player.getPersistentData()} 顶层的熟络度搬进世界存档。
+     *
+     * <p>NeoForge 在玩家重生/换维度时只复制 {@code PlayerPersisted} 子键，顶层自定义数据会丢，
+     * 这也是"死亡重生后商店退回 Day 1"的根因。迁移后玩家身上不再保留这份数据。</p>
+     */
+    private static void migrate(Player player, MinecraftServer server) {
         CompoundTag data = player.getPersistentData();
         if (!data.contains(SHOPS_KEY)) {
-            return EMPTY;
+            return;
         }
         CompoundTag shops = data.getCompound(SHOPS_KEY);
-        String key = merchant.toString();
-        return shops.contains(key) ? shops.getCompound(key) : EMPTY;
+        LumenStandingData store = LumenStandingData.get(server);
+        String prefix = player.getUUID() + "|";
+        int moved = 0;
+        for (String merchant : shops.getAllKeys()) {
+            CompoundTag value = shops.getCompound(merchant).copy();
+            for (String legacy : LEGACY_KEYS) {
+                value.remove(legacy);
+            }
+            if (!value.isEmpty()) {
+                store.putIfAbsent(prefix + merchant, value);
+                moved++;
+            }
+        }
+        data.remove(SHOPS_KEY);
+        if (moved > 0) {
+            TerminalBlade.LOGGER.info("[流明·星] 已迁移 {} 条商店熟络度到世界存档", moved);
+        }
     }
 
-    /** 写入用：不存在就建好并挂到玩家存档上。 */
+    /** 只读取用：不存在就返回一个临时空标签（不挂到存档里）。 */
+    private static CompoundTag peek(Player player, UUID merchant) {
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return EMPTY;
+        }
+        migrate(player, server);
+        return LumenStandingData.get(server).peek(key(player, merchant));
+    }
+
+    /** 写入用：不存在就建好并挂进世界存档。 */
     private static CompoundTag of(Player player, UUID merchant) {
-        CompoundTag data = player.getPersistentData();
-        CompoundTag shops;
-        if (data.contains(SHOPS_KEY)) {
-            shops = data.getCompound(SHOPS_KEY);
-        } else {
-            shops = new CompoundTag();
-            data.put(SHOPS_KEY, shops);
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return EMPTY;
         }
-        String key = merchant.toString();
-        if (!shops.contains(key)) {
-            shops.put(key, new CompoundTag());
-        }
-        return shops.getCompound(key);
+        migrate(player, server);
+        return LumenStandingData.get(server).of(key(player, merchant));
     }
 
-    /** 当前世界的"天序号"（由 {@link LumenClock} 持续维护）。 */
+    /** 当前世界的"天序号"（由 {@link LumenClock} 持续维护，统一取主世界时钟）。 */
     private static long worldDay(Player player) {
-        if (player.level() instanceof ServerLevel server) {
-            return LumenClock.of(server).daySeq();
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return 0L;
         }
-        return 0L; // 客户端不会走到这里（所有调用都在服务端）
+        return LumenClock.of(server.overworld()).daySeq();
     }
 
     // ── 查询 ────────────────────────────────────────────────────────────
@@ -135,26 +165,9 @@ public final class LumenStanding {
      * 玩家数据里只剩 {@code stage} / {@code xp} / {@code armedSeq} 三个键。</p>
      */
     public static void pruneLegacy(Player player) {
-        CompoundTag data = player.getPersistentData();
-        if (!data.contains(SHOPS_KEY)) {
-            return;
-        }
-        CompoundTag shops = data.getCompound(SHOPS_KEY);
-        int removed = 0;
-        for (String key : shops.getAllKeys()) {
-            if (!(shops.get(key) instanceof CompoundTag shop)) {
-                continue;
-            }
-            for (String legacy : LEGACY_KEYS) {
-                if (shop.contains(legacy)) {
-                    shop.remove(legacy);
-                    removed++;
-                }
-            }
-        }
-        if (removed > 0) {
-            dev.xingguang.terminalblade.TerminalBlade.LOGGER.info(
-                    "[流明·星] 清理旧存档遗留键 {} 个", removed);
+        MinecraftServer server = player.getServer();
+        if (server != null) {
+            migrate(player, server);
         }
     }
 
