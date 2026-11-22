@@ -1,5 +1,6 @@
 package dev.xingguang.terminalblade.duty;
 
+import dev.xingguang.terminalblade.TerminalBlade;
 import dev.xingguang.terminalblade.entity.LumenCompanionEntity;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -91,13 +92,22 @@ public final class CompanionTracker extends SavedData {
         if (server == null) {
             return;
         }
+        CompanionTracker tracker = get(server);
         UUID owner = pet.getOwnerUUID();
         if (!pet.isTame() || owner == null) {
-            get(server).remove(pet.getUUID());
+            if (tracker.remove(pet.getUUID())) {
+                TerminalBlade.LOGGER.info("[跟随] 随从 {} 未驯服/无主，取消登记", pet.getUUID());
+            }
             return;
         }
-        get(server).put(pet.getUUID(), owner, level.dimension(), pet.blockPosition(),
+        boolean existed = tracker.entries().containsKey(pet.getUUID());
+        tracker.put(pet.getUUID(), owner, level.dimension(), pet.blockPosition(),
                 pet.isOrderedToSit(), level.getGameTime());
+        if (!existed) {
+            TerminalBlade.LOGGER.info("[跟随] 登记随从 {}（主人={} 维度={} 位置={} 坐下={}）",
+                    pet.getUUID(), owner, level.dimension().location(), pet.blockPosition(),
+                    pet.isOrderedToSit());
+        }
     }
 
     public void put(UUID id, UUID owner, ResourceKey<Level> dimension, BlockPos pos, boolean sitting, long seenAt) {
@@ -105,9 +115,12 @@ public final class CompanionTracker extends SavedData {
         setDirty();
     }
 
-    public void remove(UUID id) {
+    /** @return 是否真的移除了记录（用于诊断日志） */
+    public boolean remove(UUID id) {
         if (this.entries.remove(id) != null) {
             setDirty();
+            return true;
         }
+        return false;
     }
 }

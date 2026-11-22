@@ -10,7 +10,7 @@ import net.minecraft.world.entity.player.Player;
 /**
  * 玩家对**某一位**流明的熟络度：阶段 + 经验条。
  *
- * <p>作用域：**每只流明各自一套，按玩家分别记录**。新刷一只就从 Day 1 开始。</p>
+ * <p>作用域：**按玩家记录一套**。同一玩家面对任何一只流明·星都延续同一套 Day，实体被重新生成、死亡重生、换维度都不会掉天数。</p>
  *
  * <p><b>"天"由 {@link LumenClock} 提供</b>：那是一个每 20 tick 持续观察
  * {@code level.getDayTime()} 的世界级单调序号（跨过 24000 边界或时间往回跳都算一次）。
@@ -39,8 +39,40 @@ public final class LumenStanding {
 
     // ── 存储 ────────────────────────────────────────────────────────────
 
-    private static String key(Player player, UUID merchant) {
-        return player.getUUID() + "|" + merchant;
+    /** 熟络度按「玩家」记录：同一玩家面对任何一只流明·星都延续同一套 Day，不会因为实体重新生成而掉天。 */
+    private static String key(Player player) {
+        return player.getUUID().toString();
+    }
+
+    /** 取两份记录里「阶段更高、同阶段经验更多」的那份。 */
+    private static CompoundTag best(CompoundTag current, CompoundTag candidate) {
+        if (candidate == null || candidate.isEmpty()) {
+            return current;
+        }
+        if (current == null || current.isEmpty()) {
+            return candidate.copy();
+        }
+        int stageA = current.getInt(STAGE);
+        int stageB = candidate.getInt(STAGE);
+        if (stageB > stageA) {
+            return candidate.copy();
+        }
+        if (stageB < stageA) {
+            return current;
+        }
+        return candidate.getInt(XP) > current.getInt(XP) ? candidate.copy() : current;
+    }
+
+    private static void copyBest(CompoundTag target, CompoundTag value) {
+        CompoundTag best = best(target.isEmpty() ? null : target.copy(), value);
+        if (best == null) {
+            return;
+        }
+        for (String k : new String[] {STAGE, XP, ARMED_SEQ}) {
+            if (best.contains(k)) {
+                target.put(k, best.get(k));
+            }
+        }
     }
 
     /**
@@ -56,7 +88,7 @@ public final class LumenStanding {
         }
         CompoundTag shops = data.getCompound(SHOPS_KEY);
         LumenStandingData store = LumenStandingData.get(server);
-        String prefix = player.getUUID() + "|";
+        String key = key(player);
         int moved = 0;
         for (String merchant : shops.getAllKeys()) {
             CompoundTag value = shops.getCompound(merchant).copy();
@@ -64,7 +96,7 @@ public final class LumenStanding {
                 value.remove(legacy);
             }
             if (!value.isEmpty()) {
-                store.putIfAbsent(prefix + merchant, value);
+                copyBest(store.of(key), value);
                 moved++;
             }
         }
@@ -74,14 +106,47 @@ public final class LumenStanding {
         }
     }
 
-    /** 只读取用：不存在就返回一个临时空标签（不挂到存档里）。 */
+    /** 把 3.2.1 之前按「玩家|流明」存的记录合并到「玩家」键；找不到就按需新建。 */
+    private static CompoundTag resolve(Player player, MinecraftServer server, boolean create) {
+        LumenStandingData store = LumenStandingData.get(server);
+        String key = key(player);
+        CompoundTag direct = store.peek(key);
+        if (!direct.isEmpty()) {
+            return direct;
+        }
+        String prefix = key + "|";
+        CompoundTag merged = null;
+        boolean found = false;
+        for (String old : new java.util.ArrayList<>(store.shops().keySet())) {
+            if (!old.startsWith(prefix)) {
+                continue;
+            }
+            merged = best(merged, store.peek(old));
+            store.remove(old);
+            found = true;
+        }
+        if (found) {
+            CompoundTag target = store.of(key);
+            if (merged != null) {
+                for (String k : new String[] {STAGE, XP, ARMED_SEQ}) {
+                    if (merged.contains(k)) {
+                        target.put(k, merged.get(k));
+                    }
+                }
+            }
+            return target;
+        }
+        return create ? store.of(key) : EMPTY;
+    }
+
+    /** 只读取用：不存在就返回一个临时空标签（不挂到存档里）。{@code merchant} 保留仅为兼容旧调用。 */
     private static CompoundTag peek(Player player, UUID merchant) {
         MinecraftServer server = player.getServer();
         if (server == null) {
             return EMPTY;
         }
         migrate(player, server);
-        return LumenStandingData.get(server).peek(key(player, merchant));
+        return resolve(player, server, false);
     }
 
     /** 写入用：不存在就建好并挂进世界存档。 */
@@ -91,7 +156,7 @@ public final class LumenStanding {
             return EMPTY;
         }
         migrate(player, server);
-        return LumenStandingData.get(server).of(key(player, merchant));
+        return resolve(player, server, true);
     }
 
     /** 当前世界的"天序号"（由 {@link LumenClock} 持续维护，统一取主世界时钟）。 */

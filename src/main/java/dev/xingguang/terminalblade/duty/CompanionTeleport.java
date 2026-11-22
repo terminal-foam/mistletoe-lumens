@@ -35,6 +35,10 @@ public final class CompanionTeleport {
     private static final int CHECK_INTERVAL_TICKS = 20;
     private static final double LEASH_DISTANCE = 64.0D;
 
+    /** 诊断用：同一只随从的失败日志最多每分钟一条，避免刷屏。 */
+    private static final java.util.Map<UUID, Long> LAST_FAIL = new java.util.HashMap<>();
+    private static boolean announced;
+
     private CompanionTeleport() {
     }
 
@@ -44,9 +48,17 @@ public final class CompanionTeleport {
         if (server.overworld().getGameTime() % CHECK_INTERVAL_TICKS != 0L) {
             return;
         }
+        if (!announced) {
+            announced = true;
+            TerminalBlade.LOGGER.info("[跟随] 跨区块跟随已启用（每 20 tick 检查一次）");
+        }
         CompanionTracker tracker = CompanionTracker.get(server);
         if (tracker.entries().isEmpty()) {
             return;
+        }
+        long now = server.overworld().getGameTime();
+        if (now % 200L == 0L) {
+            TerminalBlade.LOGGER.info("[跟随] 已登记随从 {} 只", tracker.entries().size());
         }
         // 遍历快照：处理过程中会改动 entries（传送后刷新位置、失效记录会被移除）。
         for (Map.Entry<UUID, CompanionTracker.Entry> entry : new ArrayList<>(tracker.entries().entrySet())) {
@@ -55,6 +67,15 @@ public final class CompanionTeleport {
             } catch (RuntimeException e) {
                 TerminalBlade.LOGGER.warn("[流明·星] 随从 {} 的跟随处理失败", entry.getKey(), e);
             }
+        }
+    }
+
+    private static void fail(UUID id, MinecraftServer server, String reason) {
+        long now = server.overworld().getGameTime();
+        Long last = LAST_FAIL.get(id);
+        if (last == null || now - last > 1200L) {
+            LAST_FAIL.put(id, now);
+            TerminalBlade.LOGGER.info("[跟随] 随从 {} 未能跟随：{}", id, reason);
         }
     }
 
@@ -88,6 +109,7 @@ public final class CompanionTeleport {
         }
         if (!(entity instanceof LumenCompanionEntity pet) || !pet.isAlive()) {
             // 随从已经不在了（被删除/被其它模组清理），把登记记录一起清掉。
+            fail(id, server, "区块 " + info.pos() + " 里找不到实体或已死亡，记录已清理");
             tracker.remove(id);
             return;
         }
@@ -98,6 +120,7 @@ public final class CompanionTeleport {
         ServerLevel target = owner.serverLevel();
         BlockPos spot = SafeSpots.find(target, owner.blockPosition());
         if (spot == null) {
+            fail(id, server, "主人附近找不到安全落点（主人=" + owner.blockPosition() + "）");
             return;
         }
         if (target == home) {
