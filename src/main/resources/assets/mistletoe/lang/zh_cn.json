@@ -45,11 +45,15 @@
   "message.mistletoe.lumen_lamp.no_space": "附近没有足够的安全落脚点。换个地方再举灯吧。",
   "message.mistletoe.lumen_lamp.arrived": "村口的灯亮了。",
   "item.mistletoe.lumen_lamp": "流明灯",
-  "item.mistletoe.lumen_lamp.hint": "需要我们的时候，把灯举高一点。",
+  "item.mistletoe.lumen_lamp.hint": "需要我们的时候，把灯举高一点。平时右键收起/放出跟随的随从；袭击中举灯会求援并放出随从（蹲下右键仍可收/放）。",
   "item.mistletoe.ruby": "红宝石",
   "item.mistletoe.ruby.hint": "流明之间流通的货币。她们认得这个颜色。",
   "subtitles.mistletoe.lamp_signal": "流明灯轻响",
   "subtitles.mistletoe.lamp_answer": "村口传来一声回铃",
   "bossbar.mistletoe.relief": "支援",
-  "block.mistletoe.guard_post": "流明哨所"
+  "block.mistletoe.guard_post": "流明哨所",
+  "message.mistletoe.lumen_lamp.stored": "已收起 %s 只随从",
+  "message.mistletoe.lumen_lamp.released": "已放出 %s 只随从",
+  "message.mistletoe.lumen_lamp.no_followers": "没有处于跟随状态的随从",
+  "message.mistletoe.lumen_lamp.release_failed": "主人身边没有安全落点，随从还在灯里"
 }

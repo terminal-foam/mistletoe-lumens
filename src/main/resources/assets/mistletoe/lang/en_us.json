@@ -45,11 +45,15 @@
   "message.mistletoe.lumen_lamp.no_space": "There is no safe room for the relief party. Try raising the lantern elsewhere.",
   "message.mistletoe.lumen_lamp.arrived": "A light answers at the village's edge.",
   "item.mistletoe.lumen_lamp": "Lumen Lantern",
-  "item.mistletoe.lumen_lamp.hint": "When you need us, raise the light a little higher.",
+  "item.mistletoe.lumen_lamp.hint": "When you need us, raise the light. Right-click to store/release following companions; during a raid it calls for help and releases them (sneak + right-click to toggle).",
   "item.mistletoe.ruby": "Ruby",
   "item.mistletoe.ruby.hint": "The currency traded among Lumen. They know this colour.",
   "subtitles.mistletoe.lamp_signal": "Lumen Lantern chimes",
   "subtitles.mistletoe.lamp_answer": "A chime answers from the village edge",
   "bossbar.mistletoe.relief": "Support",
-  "block.mistletoe.guard_post": "Lumen Guard Post"
+  "block.mistletoe.guard_post": "Lumen Guard Post",
+  "message.mistletoe.lumen_lamp.stored": "Stored %s companions.",
+  "message.mistletoe.lumen_lamp.released": "Released %s companions.",
+  "message.mistletoe.lumen_lamp.no_followers": "No companions are following you.",
+  "message.mistletoe.lumen_lamp.release_failed": "No safe spot nearby; your companions remain in the lamp."
 }
