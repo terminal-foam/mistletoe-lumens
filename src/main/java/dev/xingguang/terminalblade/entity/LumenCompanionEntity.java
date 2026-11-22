@@ -222,6 +222,11 @@ public class LumenCompanionEntity extends TamableAnimal implements GeoAnimatable
             tickActionLifetime();
             tickMeleeChain();
             tickLantern();
+            // 每 20 tick 刷新一次位置登记：区块卸载后服务端还能知道它最后在哪。
+            if (this.level() instanceof net.minecraft.server.level.ServerLevel serverLevel
+                    && serverLevel.getGameTime() % 20L == 0L) {
+                dev.xingguang.terminalblade.duty.CompanionTracker.touch(serverLevel, this);
+            }
         }
     }
 

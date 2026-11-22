@@ -1,13 +1,14 @@
 package dev.xingguang.terminalblade.entity;
 
 import dev.xingguang.terminalblade.TerminalBlade;
+import dev.xingguang.terminalblade.duty.CompanionTracker;
 import dev.xingguang.terminalblade.duty.RaidRelief;
+import dev.xingguang.terminalblade.duty.SafeSpots;
 import dev.xingguang.terminalblade.registry.ModEntities;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
@@ -16,8 +17,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.CampfireBlock;
-import net.minecraft.world.level.block.MagmaBlock;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
@@ -62,6 +61,8 @@ public final class LumenRespawnHandler {
         LumenRespawnData.get(server).add(pet.getUUID(), owner,
                 pet.level().getGameTime() + RESPAWN_DELAY_TICKS,
                 pet.getName().getString(), snapshot);
+        // 死亡后位置不再有效，避免跟随逻辑去读一个已经空掉的区块。
+        CompanionTracker.get(server).remove(pet.getUUID());
     }
 
     @SubscribeEvent
@@ -94,10 +95,10 @@ public final class LumenRespawnHandler {
 
         ResourceKey<Level> dimension = owner.getRespawnDimension();
         ServerLevel target = dimension == null ? null : server.getLevel(dimension);
-        BlockPos spot = target == null ? null : safeSpot(target, owner.getRespawnPosition());
+        BlockPos spot = target == null ? null : SafeSpots.find(target, owner.getRespawnPosition());
         if (spot == null) {
             target = owner.serverLevel();
-            spot = safeSpot(target, owner.blockPosition());
+            spot = SafeSpots.find(target, owner.blockPosition());
         }
         if (spot == null) {
             return false;
@@ -145,26 +146,5 @@ public final class LumenRespawnHandler {
         owner.sendSystemMessage(Component.translatable("entity.mistletoe.lumen_companion.respawned"));
         TerminalBlade.LOGGER.info("[流明·星] 随从在 {} 复活（快照={}）", spot, pending.snapshot() != null);
         return true;
-    }
-
-    /** 从给定位置向上找 12 格内能站人的位置；找不到返回 null。 */
-    private static BlockPos safeSpot(ServerLevel level, BlockPos from) {
-        if (from == null) {
-            return null;
-        }
-        for (int dy = 0; dy < 12; dy++) {
-            BlockPos feet = from.above(dy);
-            if (!level.isEmptyBlock(feet) || !level.isEmptyBlock(feet.above())) {
-                continue;
-            }
-            BlockPos below = feet.below();
-            var floor = level.getBlockState(below);
-            if (floor.isFaceSturdy(level, below, Direction.UP)
-                    && !(floor.getBlock() instanceof MagmaBlock)
-                    && !(floor.getBlock() instanceof CampfireBlock)) {
-                return feet;
-            }
-        }
-        return null;
     }
 }
